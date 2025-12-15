@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Site Photo Upload</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <link rel="stylesheet" href="https://js.arcgis.com/4.29/esri/themes/light/main.css">
+  <script src="https://js.arcgis.com/4.29/"></script>
+
+  <style>
+    body {
+      font-family: Arial;
+      background: #f4f6f8;
+      padding: 15px;
+    }
+    .card {
+      background: white;
+      padding: 20px;
+      max-width: 420px;
+      margin: auto;
+      border-radius: 10px;
+      box-shadow: 0 4px 10px rgba(0,0,0,.1);
+    }
+    label { font-weight: bold; margin-top: 10px; display: block; }
+    input, textarea, button {
+      width: 100%;
+      padding: 8px;
+      margin-top: 5px;
+    }
+    button {
+      background: #0079c1;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      margin-top: 15px;
+    }
+    .status { text-align: center; margin-top: 10px; }
+  </style>
+</head>
+
+<body>
+
+<div class="card">
+  <h2>Site Photo Upload</h2>
+
+  <label>Site Name</label>
+  <input id="siteName" type="text" required>
+
+  <label>Remarks</label>
+  <textarea id="remarks"></textarea>
+
+  <label>Capture Photo</label>
+  <input id="photo" type="file" accept="image/*" capture required>
+
+  <button id="submitBtn">Upload</button>
+  <div class="status" id="status"></div>
+</div>
+
+<script>
+require([
+  "esri/layers/FeatureLayer",
+  "esri/geometry/Point"
+], function (FeatureLayer, Point) {
+
+  const layer = new FeatureLayer({
+    url: "https://services.arcgis.com/NJ6dRODVurthn1U5/arcgis/rest/services/site_location/FeatureServer/0"
+  });
+
+  const btn = document.getElementById("submitBtn");
+  const status = document.getElementById("status");
+
+  btn.onclick = () => {
+
+    const siteName = siteNameInput = document.getElementById("siteName").value.trim();
+    const remarks = document.getElementById("remarks").value.trim();
+    const photo = document.getElementById("photo").files[0];
+
+    if (!siteName || !photo) {
+      alert("Site Name aur Photo required hai");
+      return;
+    }
+
+    btn.disabled = true;
+    status.innerHTML = "📍 Location le rahe hain...";
+
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+
+        const point = new Point({
+          longitude: pos.coords.longitude,
+          latitude: pos.coords.latitude
+        });
+
+        status.innerHTML = "📤 Data save ho raha hai...";
+
+        layer.applyEdits({
+          addFeatures: [{
+            geometry: point,
+            attributes: {
+              Site_Name: siteName,
+              Remarks: remarks,
+              Upload_Date: Date.now()
+            }
+          }]
+        }).then(res => {
+
+          const oid = res.addFeatureResults[0].objectId;
+
+          status.innerHTML = "📸 Photo upload ho raha hai...";
+
+          layer.addAttachment(oid, photo).then(() => {
+            status.innerHTML = "✅ Upload successful";
+            btn.disabled = false;
+
+            document.getElementById("siteName").value = "";
+            document.getElementById("remarks").value = "";
+            document.getElementById("photo").value = "";
+
+          });
+
+        }).catch(err => {
+          console.error(err);
+          status.innerHTML = "❌ Error occurred";
+          btn.disabled = false;
+        });
+
+      },
+      () => {
+        alert("GPS permission allow karo");
+        btn.disabled = false;
+      }
+    );
+  };
+});
+</script>
+
+</body>
+</html>
