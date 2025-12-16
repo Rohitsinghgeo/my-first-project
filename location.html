@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -9,13 +10,9 @@
   <script src="https://js.arcgis.com/4.29/"></script>
 
   <style>
-    body {
-      font-family: Arial;
-      background: #f4f6f8;
-      padding: 15px;
-    }
+    body { font-family: Arial; background: #f4f6f8; padding: 15px; }
     .card {
-      background: white;
+      background: #fff;
       padding: 20px;
       max-width: 420px;
       margin: auto;
@@ -30,10 +27,11 @@
     }
     button {
       background: #0079c1;
-      color: white;
+      color: #fff;
       border: none;
       border-radius: 5px;
       margin-top: 15px;
+      cursor: pointer;
     }
     .status { text-align: center; margin-top: 10px; }
   </style>
@@ -60,11 +58,28 @@
 <script>
 require([
   "esri/layers/FeatureLayer",
-  "esri/geometry/Point"
-], function (FeatureLayer, Point) {
+  "esri/geometry/Point",
+  "esri/identity/OAuthInfo",
+  "esri/identity/IdentityManager"
+], function (FeatureLayer, Point, OAuthInfo, IdentityManager) {
+
+  // 🔐 OAuth configuration (ONLY Client ID)
+  const oauthInfo = new OAuthInfo({
+    appId: "zbSCsaBAPGA7SIqv",   // ✅ Client ID ONLY
+    portalUrl: "https://www.arcgis.com",
+    popup: false
+  });
+
+  IdentityManager.registerOAuthInfos([oauthInfo]);
+
+  IdentityManager.checkSignInStatus("https://www.arcgis.com/sharing")
+    .catch(() => {
+      return IdentityManager.getCredential("https://www.arcgis.com/sharing");
+    });
 
   const layer = new FeatureLayer({
-    url: "https://services.arcgis.com/NJ6dRODVurthn1U5/arcgis/rest/services/site_location/FeatureServer/0"
+    url: "https://services.arcgis.com/NJ6dRODVurthn1U5/arcgis/rest/services/site_location/FeatureServer/0",
+    outFields: ["*"]
   });
 
   const btn = document.getElementById("submitBtn");
@@ -72,7 +87,7 @@ require([
 
   btn.onclick = () => {
 
-    const siteName = siteNameInput = document.getElementById("siteName").value.trim();
+    const siteName = document.getElementById("siteName").value.trim();
     const remarks = document.getElementById("remarks").value.trim();
     const photo = document.getElementById("photo").files[0];
 
@@ -92,7 +107,7 @@ require([
           latitude: pos.coords.latitude
         });
 
-        status.innerHTML = "📤 Data save ho raha hai...";
+        status.innerHTML = "📤 Feature save ho raha hai...";
 
         layer.applyEdits({
           addFeatures: [{
@@ -100,28 +115,26 @@ require([
             attributes: {
               Site_Name: siteName,
               Remarks: remarks,
-              Upload_Date: Date.now()
+              Upload_Date: new Date()
             }
           }]
         }).then(res => {
 
           const oid = res.addFeatureResults[0].objectId;
-
-          status.innerHTML = "📸 Photo upload ho raha hai...";
+          status.innerHTML = "📸 Photo upload ho rahi hai...";
 
           layer.addAttachment(oid, photo).then(() => {
-            status.innerHTML = "✅ Upload successful";
+            status.innerHTML = "✅ Feature + Photo upload successful";
             btn.disabled = false;
 
             document.getElementById("siteName").value = "";
             document.getElementById("remarks").value = "";
             document.getElementById("photo").value = "";
-
           });
 
         }).catch(err => {
           console.error(err);
-          status.innerHTML = "❌ Error occurred";
+          status.innerHTML = "❌ Upload failed";
           btn.disabled = false;
         });
 
