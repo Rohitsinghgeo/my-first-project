@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -39,9 +38,7 @@
       margin-top: 15px;
       cursor: pointer;
     }
-    button:disabled {
-      background: gray;
-    }
+    button:disabled { background: gray; }
     .status {
       text-align: center;
       margin-top: 10px;
@@ -76,9 +73,9 @@ require([
   "esri/identity/IdentityManager"
 ], function (FeatureLayer, Point, OAuthInfo, IdentityManager) {
 
-  /* ========= OAuth LOGIN ========= */
+  /* ========= OAUTH CONFIG ========= */
   const oauthInfo = new OAuthInfo({
-    appId: "zbSCsaBAPGA7SIqv",   // ✅ ONLY CLIENT ID
+    appId: "eTivrXGOGm2NxME8",   // ✅ YOUR CURRENT CLIENT ID
     portalUrl: "https://www.arcgis.com",
     popup: false
   });
@@ -92,7 +89,7 @@ require([
 
   /* ========= FEATURE LAYER ========= */
   const layer = new FeatureLayer({
-    url: "https://services.arcgis.com/NJ6dRODVurthn1U5/arcgis/rest/services/SITE_LOCATION/FeatureServer/0",
+    url: "https://services.arcgis.com/NJ6dRODVurthn1U5/arcgis/rest/services/site_location/FeatureServer/0",
     outFields: ["*"]
   });
 
@@ -143,7 +140,6 @@ require([
 
           status.innerHTML = "📸 Photo upload ho rahi hai...";
 
-          /* ======= CORRECT ATTACHMENT CODE ======= */
           layer.addAttachment({
             objectId: oid,
             attachment: photo
