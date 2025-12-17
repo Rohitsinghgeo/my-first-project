@@ -1,70 +1,3 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <title>Site Photo Upload</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-
-  <!-- ArcGIS JS API -->
-  <link rel="stylesheet" href="https://js.arcgis.com/4.29/esri/themes/light/main.css">
-  <script src="https://js.arcgis.com/4.29/"></script>
-
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      background: #f4f6f8;
-      padding: 20px;
-    }
-    .card {
-      background: #fff;
-      padding: 20px;
-      max-width: 420px;
-      margin: auto;
-      border-radius: 10px;
-      box-shadow: 0 4px 10px rgba(0,0,0,.1);
-    }
-    h2 { text-align: center; }
-    label { font-weight: bold; display: block; margin-top: 10px; }
-    input, textarea, button {
-      width: 100%;
-      padding: 8px;
-      margin-top: 5px;
-    }
-    button {
-      background: #0079c1;
-      color: white;
-      border: none;
-      border-radius: 5px;
-      margin-top: 15px;
-      cursor: pointer;
-    }
-    button:disabled { background: gray; }
-    .status {
-      text-align: center;
-      margin-top: 10px;
-      font-weight: bold;
-    }
-  </style>
-</head>
-
-<body>
-
-<div class="card">
-  <h2>Site Photo Upload</h2>
-
-  <label>Site Name</label>
-  <input type="text" id="siteName" required>
-
-  <label>Remarks</label>
-  <textarea id="remarks"></textarea>
-
-  <label>Capture Photo</label>
-  <input type="file" id="photo" accept="image/*" capture required>
-
-  <button id="submitBtn">Upload</button>
-  <div class="status" id="status"></div>
-</div>
-
 <script>
 require([
   "esri/layers/FeatureLayer",
@@ -73,23 +6,17 @@ require([
   "esri/identity/IdentityManager"
 ], function (FeatureLayer, Point, OAuthInfo, IdentityManager) {
 
-  /* ========= OAUTH CONFIG ========= */
   const oauthInfo = new OAuthInfo({
-    appId: "eTivrXGOGm2NxME8",   // ✅ YOUR CURRENT CLIENT ID
+    appId: "eTivrXGOGm2NxME8",
     portalUrl: "https://www.arcgis.com",
     popup: false
   });
 
   IdentityManager.registerOAuthInfos([oauthInfo]);
+  IdentityManager.getCredential("https://www.arcgis.com/sharing");
 
-  IdentityManager.checkSignInStatus("https://www.arcgis.com/sharing")
-    .catch(() => {
-      return IdentityManager.getCredential("https://www.arcgis.com/sharing");
-    });
-
-  /* ========= FEATURE LAYER ========= */
   const layer = new FeatureLayer({
-    url: "https://services.arcgis.com/NJ6dRODVurthn1U5/arcgis/rest/services/site_location/FeatureServer/0",
+    url: "https://services.arcgis.com/NJ6dRODVurthn1U5/arcgis/rest/services/SITE_LOCATION/FeatureServer/0",
     outFields: ["*"]
   });
 
@@ -97,7 +24,6 @@ require([
   const status = document.getElementById("status");
 
   btn.onclick = function () {
-
     const siteName = document.getElementById("siteName").value.trim();
     const remarks = document.getElementById("remarks").value.trim();
     const photo = document.getElementById("photo").files[0];
@@ -132,11 +58,6 @@ require([
         }).then(function (res) {
 
           const oid = res.addFeatureResults[0].objectId;
-          if (!oid) {
-            status.innerHTML = "❌ Feature save failed";
-            btn.disabled = false;
-            return;
-          }
 
           status.innerHTML = "📸 Photo upload ho rahi hai...";
 
@@ -144,24 +65,10 @@ require([
             objectId: oid,
             attachment: photo
           }).then(function () {
-
             status.innerHTML = "✅ Feature + Photo upload successful";
-            btn.disabled = false;
-
-            document.getElementById("siteName").value = "";
-            document.getElementById("remarks").value = "";
-            document.getElementById("photo").value = "";
-
-          }).catch(function (err) {
-            console.error(err);
-            status.innerHTML =  "❌ Photo upload failed";
             btn.disabled = false;
           });
 
-        }).catch(function (err) {
-          console.error(err);
-          status.innerHTML = "❌ Feature add error";
-          btn.disabled = false;
         });
 
       },
@@ -174,7 +81,3 @@ require([
 
 });
 </script>
-
-</body>
-</html>
-
