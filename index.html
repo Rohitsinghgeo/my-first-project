@@ -8,33 +8,90 @@
   <link rel="stylesheet" href="https://js.arcgis.com/4.29/esri/themes/light/main.css">
   <script src="https://js.arcgis.com/4.29/"></script>
 
+  <!-- EXIF LIB -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/exif-js/2.3.0/exif.min.js"></script>
+
   <style>
     body {
       font-family: Arial, sans-serif;
-      background: #f4f6f8;
-      padding: 20px;
+      min-height: 100vh;
+      margin: 0;
+      background:
+        linear-gradient(rgba(0,0,0,0.55), rgba(0,0,0,0.55)),
+        url('https://images.unsplash.com/photo-1500530855697-b586d89ba3ee');
+      background-size: cover;
+      background-position: center;
+      display: flex;
+      align-items: center;
+      justify-content: center;
     }
+
     .box {
-      background: #fff;
-      padding: 20px;
-      max-width: 500px;
-      margin: auto;
-      border-radius: 6px;
-      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-    }
-    input, button {
+      background: rgba(255,255,255,0.95);
+      padding: 25px;
+      max-width: 520px;
       width: 100%;
-      padding: 10px;
-      margin-top: 10px;
+      border-radius: 10px;
+      box-shadow: 0 8px 25px rgba(0,0,0,0.25);
     }
+
+    h2 {
+      text-align: center;
+      color: #003b5c;
+      margin-bottom: 20px;
+    }
+
+    .field-group {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    input {
+      padding: 10px;
+      border-radius: 5px;
+      border: 1px solid #ccc;
+      font-size: 14px;
+    }
+
+    .full { grid-column: span 2; }
+
     button {
-      background: #0079c1;
+      width: 100%;
+      padding: 12px;
+      margin-top: 15px;
+      background: linear-gradient(135deg, #0079c1, #005e95);
       color: #fff;
       border: none;
+      border-radius: 6px;
+      font-size: 15px;
       cursor: pointer;
+      font-weight: bold;
     }
-    button:hover {
-      background: #005e95;
+
+    #status {
+      margin-top: 10px;
+      text-align: center;
+      font-size: 14px;
+    }
+
+    .footer {
+      margin-top: 20px;
+      text-align: center;
+      border-top: 1px solid #ddd;
+      padding-top: 15px;
+    }
+
+    .footer img {
+      height: 45px;
+      margin-bottom: 6px;
+    }
+
+    .footer-text {
+      font-size: 13px;
+      font-weight: bold;
+      color: #003b5c;
+      letter-spacing: 1px;
     }
   </style>
 </head>
@@ -42,14 +99,27 @@
 <body>
 
 <div class="box">
-  <h2>SITE LOCATION – Photo Upload</h2>
+  <h2>KALPATARU PROJECTS INTERNATIONAL LIMITED<br>SITE SURVEY</h2>
 
-  <input type="text" id="siteName" placeholder="Site Name" />
-  <input type="text" id="remarks" placeholder="Remarks" />
-  <input type="file" id="photo" accept="image/*" />
-  <button onclick="uploadData()">Upload</button>
+  <div class="field-group">
+    <input type="text" id="CLUSTER" placeholder="Cluster" />
+    <input type="text" id="SITENAME" placeholder="Site Name" />
 
+    <input type="date" id="DATE" />
+    <input type="text" id="COMPONENTS" placeholder="Components" />
+
+    <input type="text" id="SUB_COMPONENTS" placeholder="Sub Components" class="full" />
+    <input type="text" id="REMARKS" placeholder="Remarks" class="full" />
+
+    <input type="file" id="photo" accept="image/*" class="full" />
+  </div>
+
+  <button onclick="uploadData()">Upload Survey Data</button>
   <p id="status"></p>
+  <div class="footer">
+    <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/4/46/Kalpataru_logo.svg/1024px-Kalpataru_logo.svg.png?20210728073518" alt="Kalpataru Logo" />
+    <div class="footer-text">KALPATARU WATER TEAM</div>
+  </div>
 </div>
 
 <script>
@@ -58,117 +128,82 @@ require([
   "esri/request"
 ], function (Point, esriRequest) {
 
-  const featureUrl =
-    "https://services.arcgis.com/NJ6dRODVurthn1U5/arcgis/rest/services/SITE_LOCATION/FeatureServer/0";
+  const featureUrl = "https://services.arcgis.com/NJ6dRODVurthn1U5/arcgis/rest/services/SITE_LOCATION/FeatureServer/0";
 
-  // 🔹 DMS → Decimal (AUTO FIX)
-  function dmsToDecimal(deg, min, sec, dir) {
-    let d = Math.abs(deg);
-    let m = Math.abs(min);
-    let s = Math.abs(sec);
-
-    // Normalize (important for your photos)
-    m += Math.floor(s / 60);
-    s = s % 60;
-    d += Math.floor(m / 60);
-    m = m % 60;
-
-    let dec = d + (m / 60) + (s / 3600);
-    if (dir === "S" || dir === "W") dec *= -1;
-    return dec;
+  function dmsToDecimal(d, m, s, ref) {
+    let dec = d + m / 60 + s / 3600;
+    return (ref === 'S' || ref === 'W') ? -dec : dec;
   }
 
-  // 🔹 Read GPS from image
   function readGPS(file) {
     return new Promise((resolve, reject) => {
       EXIF.getData(file, function () {
-        const lat = EXIF.getTag(this, "GPSLatitude");
-        const lon = EXIF.getTag(this, "GPSLongitude");
-        const latRef = EXIF.getTag(this, "GPSLatitudeRef");
-        const lonRef = EXIF.getTag(this, "GPSLongitudeRef");
+        const lat = EXIF.getTag(this, 'GPSLatitude');
+        const lon = EXIF.getTag(this, 'GPSLongitude');
+        const latRef = EXIF.getTag(this, 'GPSLatitudeRef');
+        const lonRef = EXIF.getTag(this, 'GPSLongitudeRef');
 
-        if (!lat || !lon) {
-          reject("GPS data not found in photo");
-          return;
-        }
+        if (!lat || !lon) reject('GPS data not found in photo');
 
-        const latitude = dmsToDecimal(lat[0], lat[1], lat[2], latRef);
-        const longitude = dmsToDecimal(lon[0], lon[1], lon[2], lonRef);
-
-        resolve({ latitude, longitude });
+        resolve({
+          latitude: dmsToDecimal(lat[0], lat[1], lat[2], latRef),
+          longitude: dmsToDecimal(lon[0], lon[1], lon[2], lonRef)
+        });
       });
     });
   }
 
   window.uploadData = async function () {
-    const siteName = document.getElementById("siteName").value;
-    const remarks = document.getElementById("remarks").value;
-    const fileInput = document.getElementById("photo");
-    const status = document.getElementById("status");
+    const status = document.getElementById('status');
+    const file = document.getElementById('photo').files[0];
 
-    if (!fileInput.files.length) {
-      alert("Photo select karo");
-      return;
-    }
+    if (!file) return alert('Photo select karo');
 
-    status.innerText = "Reading GPS from photo...";
+    status.innerText = '📍 Reading GPS from photo...';
 
     try {
-      const gps = await readGPS(fileInput.files[0]);
+      const gps = await readGPS(file);
 
       const point = new Point({
-        longitude: gps.longitude,
         latitude: gps.latitude,
+        longitude: gps.longitude,
         spatialReference: { wkid: 4326 }
       });
 
-      // 🔹 Add feature
-      const addFeatureResponse = await esriRequest(
-        featureUrl + "/addFeatures",
-        {
-          method: "post",
-          query: {
-            f: "json",
-            features: JSON.stringify([{
-              geometry: point,
-              attributes: {
-                SITE_NAME: siteName,
-                REMARKS: remarks
-              }
-            }])
-          }
+      const attributes = {
+        CLUSTER: CLUSTER.value,
+        SITENAME: SITENAME.value,
+        DATE_: DATE.value,
+        COMPONENTS: COMPONENTS.value,
+        SUB_COMPONENTS: SUB_COMPONENTS.value,
+        REMARKS: REMARKS.value
+      };
+
+      const addRes = await esriRequest(featureUrl + '/addFeatures', {
+        method: 'post',
+        query: {
+          f: 'json',
+          features: JSON.stringify([{ geometry: point, attributes }])
         }
-      );
+      });
 
-      const objectId =
-        addFeatureResponse.data.addResults[0].objectId;
+      const oid = addRes.data.addResults[0].objectId;
 
-      // 🔹 Add attachment
-      const formData = new FormData();
-      formData.append("attachment", fileInput.files[0]);
-      formData.append("f", "json");
+      const fd = new FormData();
+      fd.append('attachment', file);
+      fd.append('f', 'json');
 
-      await fetch(
-        `${featureUrl}/${objectId}/addAttachment`,
-        {
-          method: "POST",
-          body: formData
-        }
-      );
+      await fetch(`${featureUrl}/${oid}/addAttachment`, { method: 'POST', body: fd });
 
-      status.innerText = "✅ Data + Photo uploaded successfully!";
-      fileInput.value = "";
+      status.innerText = '✅ Data + Photo uploaded successfully';
     }
-    catch (err) {
-      console.error(err);
-      status.innerText = "❌ Error: " + err;
+    catch (e) {
+      console.error(e);
+      status.innerText = '❌ ' + e;
     }
   };
 });
 </script>
-
-<!-- EXIF LIB -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/exif-js/2.3.0/exif.min.js"></script>
 
 </body>
 </html>
