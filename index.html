@@ -2,100 +2,173 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>SITE LOCATION Upload</title>
+  <title>SITE_LOCATION – Photo Upload</title>
 
+  <!-- ArcGIS JS API -->
   <link rel="stylesheet" href="https://js.arcgis.com/4.29/esri/themes/light/main.css">
   <script src="https://js.arcgis.com/4.29/"></script>
 
   <style>
-    body { font-family: Arial; padding: 20px; }
-    input, button { margin: 6px 0; width: 250px; }
+    body {
+      font-family: Arial, sans-serif;
+      background: #f4f6f8;
+      padding: 20px;
+    }
+    .box {
+      background: #fff;
+      padding: 20px;
+      max-width: 500px;
+      margin: auto;
+      border-radius: 6px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+    input, button {
+      width: 100%;
+      padding: 10px;
+      margin-top: 10px;
+    }
+    button {
+      background: #0079c1;
+      color: #fff;
+      border: none;
+      cursor: pointer;
+    }
+    button:hover {
+      background: #005e95;
+    }
   </style>
 </head>
 
 <body>
 
-<h2>SITE LOCATION FORM</h2>
+<div class="box">
+  <h2>SITE LOCATION – Photo Upload</h2>
 
-<input type="text" id="siteName" placeholder="Site Name" /><br>
-<input type="text" id="remarks" placeholder="Remarks" /><br>
-<input type="file" id="photo" accept="image/*" /><br>
-<button id="submitBtn">Submit</button>
+  <input type="text" id="siteName" placeholder="Site Name" />
+  <input type="text" id="remarks" placeholder="Remarks" />
+  <input type="file" id="photo" accept="image/*" />
+  <button onclick="uploadData()">Upload</button>
+
+  <p id="status"></p>
+</div>
 
 <script>
 require([
-  "esri/portal/Portal",
-  "esri/layers/FeatureLayer",
-  "esri/identity/OAuthInfo",
-  "esri/identity/IdentityManager"
-], function (Portal, FeatureLayer, OAuthInfo, esriId) {
+  "esri/geometry/Point",
+  "esri/request"
+], function (Point, esriRequest) {
 
-  // 🔐 OAuth
-  const oauthInfo = new OAuthInfo({
-    appId: "eTivrXGOGm2NxME8",
-    portalUrl: "https://www.arcgis.com",
-    popup: false
-  });
-  esriId.registerOAuthInfos([oauthInfo]);
+  const featureUrl =
+    "https://services.arcgis.com/NJ6dRODVurthn1U5/arcgis/rest/services/SITE_LOCATION/FeatureServer/0";
 
-  esriId.getCredential("https://www.arcgis.com");
+  // 🔹 DMS → Decimal (AUTO FIX)
+  function dmsToDecimal(deg, min, sec, dir) {
+    let d = Math.abs(deg);
+    let m = Math.abs(min);
+    let s = Math.abs(sec);
 
-  const portal = new Portal();
-  portal.load();
+    // Normalize (important for your photos)
+    m += Math.floor(s / 60);
+    s = s % 60;
+    d += Math.floor(m / 60);
+    m = m % 60;
 
-  const layer = new FeatureLayer({
-    url: "https://services.arcgis.com/NJ6dRODVurthn1U5/arcgis/rest/services/SITE_LOCATION/FeatureServer/0"
-  });
+    let dec = d + (m / 60) + (s / 3600);
+    if (dir === "S" || dir === "W") dec *= -1;
+    return dec;
+  }
 
-  document.getElementById("submitBtn").onclick = async function () {
+  // 🔹 Read GPS from image
+  function readGPS(file) {
+    return new Promise((resolve, reject) => {
+      EXIF.getData(file, function () {
+        const lat = EXIF.getTag(this, "GPSLatitude");
+        const lon = EXIF.getTag(this, "GPSLongitude");
+        const latRef = EXIF.getTag(this, "GPSLatitudeRef");
+        const lonRef = EXIF.getTag(this, "GPSLongitudeRef");
 
+        if (!lat || !lon) {
+          reject("GPS data not found in photo");
+          return;
+        }
+
+        const latitude = dmsToDecimal(lat[0], lat[1], lat[2], latRef);
+        const longitude = dmsToDecimal(lon[0], lon[1], lon[2], lonRef);
+
+        resolve({ latitude, longitude });
+      });
+    });
+  }
+
+  window.uploadData = async function () {
     const siteName = document.getElementById("siteName").value;
     const remarks = document.getElementById("remarks").value;
-    const photoFile = document.getElementById("photo").files[0];
+    const fileInput = document.getElementById("photo");
+    const status = document.getElementById("status");
 
-    if (!photoFile) {
-      alert("Please select photo");
+    if (!fileInput.files.length) {
+      alert("Photo select karo");
       return;
     }
 
-    // 📍 Dummy point (change if needed)
-    const point = {
-      type: "point",
-      longitude: 77,
-      latitude: 28
-    };
+    status.innerText = "Reading GPS from photo...";
 
-    // ✅ STEP 1: ADD FEATURE
-    const addResult = await layer.applyEdits({
-      addFeatures: [{
-        geometry: point,
-        attributes: {
-          SITE_NAME: siteName,
-          REMARKS: remarks
+    try {
+      const gps = await readGPS(fileInput.files[0]);
+
+      const point = new Point({
+        longitude: gps.longitude,
+        latitude: gps.latitude,
+        spatialReference: { wkid: 4326 }
+      });
+
+      // 🔹 Add feature
+      const addFeatureResponse = await esriRequest(
+        featureUrl + "/addFeatures",
+        {
+          method: "post",
+          query: {
+            f: "json",
+            features: JSON.stringify([{
+              geometry: point,
+              attributes: {
+                SITE_NAME: siteName,
+                REMARKS: remarks
+              }
+            }])
+          }
         }
-      }]
-    });
+      );
 
-    const objectId = addResult.addFeatureResults[0].objectId;
+      const objectId =
+        addFeatureResponse.data.addResults[0].objectId;
 
-    // ✅ STEP 2: ADD ATTACHMENT
-    const formData = new FormData();
-    formData.append("attachment", photoFile);
-    formData.append("f", "json");
-    formData.append("token", esriId.credentials[0].token);
+      // 🔹 Add attachment
+      const formData = new FormData();
+      formData.append("attachment", fileInput.files[0]);
+      formData.append("f", "json");
 
-    await fetch(
-      `https://services.arcgis.com/NJ6dRODVurthn1U5/arcgis/rest/services/SITE_LOCATION/FeatureServer/0/${objectId}/addAttachment`,
-      {
-        method: "POST",
-        body: formData
-      }
-    );
+      await fetch(
+        `${featureUrl}/${objectId}/addAttachment`,
+        {
+          method: "POST",
+          body: formData
+        }
+      );
 
-    alert("✅ Feature + Photo uploaded successfully");
+      status.innerText = "✅ Data + Photo uploaded successfully!";
+      fileInput.value = "";
+    }
+    catch (err) {
+      console.error(err);
+      status.innerText = "❌ Error: " + err;
+    }
   };
 });
 </script>
+
+<!-- EXIF LIB -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/exif-js/2.3.0/exif.min.js"></script>
 
 </body>
 </html>
