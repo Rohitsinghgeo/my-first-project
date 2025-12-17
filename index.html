@@ -2,137 +2,100 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Site Photo Upload</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SITE LOCATION Upload</title>
 
-  <!-- ArcGIS JS API (MANDATORY) -->
   <link rel="stylesheet" href="https://js.arcgis.com/4.29/esri/themes/light/main.css">
   <script src="https://js.arcgis.com/4.29/"></script>
 
   <style>
-    body {
-      font-family: Arial, sans-serif;
-      background: #f4f6f8;
-      padding: 20px;
-    }
-    .card {
-      background: #fff;
-      padding: 20px;
-      max-width: 420px;
-      margin: auto;
-      border-radius: 10px;
-      box-shadow: 0 4px 10px rgba(0,0,0,.1);
-    }
-    h2 { text-align: center; }
-    label { font-weight: bold; margin-top: 10px; display: block; }
-    input, textarea, button {
-      width: 100%;
-      padding: 8px;
-      margin-top: 5px;
-    }
-    button {
-      background: #0079c1;
-      color: white;
-      border: none;
-      border-radius: 5px;
-      margin-top: 15px;
-      cursor: pointer;
-    }
-    .status {
-      text-align: center;
-      margin-top: 10px;
-      font-weight: bold;
-    }
+    body { font-family: Arial; padding: 20px; }
+    input, button { margin: 6px 0; width: 250px; }
   </style>
 </head>
 
 <body>
 
-<div class="card">
-  <h2>Site Photo Upload</h2>
+<h2>SITE LOCATION FORM</h2>
 
-  <label>Site Name</label>
-  <input type="text" id="siteName">
+<input type="text" id="siteName" placeholder="Site Name" /><br>
+<input type="text" id="remarks" placeholder="Remarks" /><br>
+<input type="file" id="photo" accept="image/*" /><br>
+<button id="submitBtn">Submit</button>
 
-  <label>Remarks</label>
-  <textarea id="remarks"></textarea>
-
-  <label>Capture Photo</label>
-  <input type="file" id="photo" accept="image/*">
-
-  <button id="submitBtn">Upload</button>
-  <div class="status" id="status"></div>
-</div>
-
-<!-- ✅ SCRIPT MUST BE AFTER HTML -->
 <script>
 require([
+  "esri/portal/Portal",
   "esri/layers/FeatureLayer",
-  "esri/geometry/Point",
   "esri/identity/OAuthInfo",
   "esri/identity/IdentityManager"
-], function (FeatureLayer, Point, OAuthInfo, IdentityManager) {
+], function (Portal, FeatureLayer, OAuthInfo, esriId) {
 
+  // 🔐 OAuth
   const oauthInfo = new OAuthInfo({
     appId: "eTivrXGOGm2NxME8",
     portalUrl: "https://www.arcgis.com",
     popup: false
   });
+  esriId.registerOAuthInfos([oauthInfo]);
 
-  IdentityManager.registerOAuthInfos([oauthInfo]);
-  IdentityManager.getCredential("https://www.arcgis.com/sharing");
+  esriId.getCredential("https://www.arcgis.com");
+
+  const portal = new Portal();
+  portal.load();
 
   const layer = new FeatureLayer({
     url: "https://services.arcgis.com/NJ6dRODVurthn1U5/arcgis/rest/services/SITE_LOCATION/FeatureServer/0"
   });
 
-  document.getElementById("submitBtn").onclick = function () {
+  document.getElementById("submitBtn").onclick = async function () {
 
     const siteName = document.getElementById("siteName").value;
     const remarks = document.getElementById("remarks").value;
-    const photo = document.getElementById("photo").files[0];
+    const photoFile = document.getElementById("photo").files[0];
 
-    if (!siteName || !photo) {
-      alert("Site Name aur Photo required hai");
+    if (!photoFile) {
+      alert("Please select photo");
       return;
     }
 
-    document.getElementById("status").innerHTML = "📍 Getting location...";
+    // 📍 Dummy point (change if needed)
+    const point = {
+      type: "point",
+      longitude: 77,
+      latitude: 28
+    };
 
-    navigator.geolocation.getCurrentPosition(function (pos) {
-
-      const point = new Point({
-        longitude: pos.coords.longitude,
-        latitude: pos.coords.latitude
-      });
-
-      layer.applyEdits({
-        addFeatures: [{
-          geometry: point,
-          attributes: {
-            Site_Name: siteName,
-            Remarks: remarks
-          }
-        }]
-      }).then(function (res) {
-
-        const oid = res.addFeatureResults[0].objectId;
-
-        layer.addAttachment({
-          objectId: oid,
-          attachment: photo
-        }).then(function () {
-          document.getElementById("status").innerHTML =
-            "✅ Feature + Photo uploaded successfully";
-        });
-
-      });
-
+    // ✅ STEP 1: ADD FEATURE
+    const addResult = await layer.applyEdits({
+      addFeatures: [{
+        geometry: point,
+        attributes: {
+          SITE_NAME: siteName,
+          REMARKS: remarks
+        }
+      }]
     });
+
+    const objectId = addResult.addFeatureResults[0].objectId;
+
+    // ✅ STEP 2: ADD ATTACHMENT
+    const formData = new FormData();
+    formData.append("attachment", photoFile);
+    formData.append("f", "json");
+    formData.append("token", esriId.credentials[0].token);
+
+    await fetch(
+      `https://services.arcgis.com/NJ6dRODVurthn1U5/arcgis/rest/services/SITE_LOCATION/FeatureServer/0/${objectId}/addAttachment`,
+      {
+        method: "POST",
+        body: formData
+      }
+    );
+
+    alert("✅ Feature + Photo uploaded successfully");
   };
 });
 </script>
 
 </body>
 </html>
-
