@@ -1,143 +1,107 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <title>SITE_LOCATION – Camera Survey</title>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-  <!-- ArcGIS JS API -->
-  <link rel="stylesheet" href="https://js.arcgis.com/4.29/esri/themes/light/main.css">
-  <script src="https://js.arcgis.com/4.29/"></script>
+<title>SITE_LOCATION – Camera Survey</title>
 
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      min-height: 100vh;
-      margin: 0;
-      background:
-        linear-gradient(rgba(0,0,0,0.55), rgba(0,0,0,0.55)),
-        url('https://images.unsplash.com/photo-1500530855697-b586d89ba3ee');
-      background-size: cover;
-      background-position: center;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
+<link rel="stylesheet" href="https://js.arcgis.com/4.29/esri/themes/light/main.css">
+<script src="https://js.arcgis.com/4.29/"></script>
 
-    .box {
-      background: rgba(255,255,255,0.95);
-      padding: 25px;
-      max-width: 520px;
-      width: 100%;
-      border-radius: 10px;
-      box-shadow: 0 8px 25px rgba(0,0,0,0.25);
-    }
+<style>
+body {
+  font-family: Arial, sans-serif;
+  min-height: 100vh;
+  margin: 0;
+  background:
+    linear-gradient(rgba(0,0,0,0.55), rgba(0,0,0,0.55)),
+    url('https://images.unsplash.com/photo-1500530855697-b586d89ba3ee');
+  background-size: cover;
+  background-position: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
 
-    h2 {
-      text-align: center;
-      color: #003b5c;
-      margin-bottom: 20px;
-    }
+.box {
+  background: rgba(255,255,255,0.95);
+  padding: 25px;
+  max-width: 520px;
+  width: 100%;
+  border-radius: 10px;
+  box-shadow: 0 8px 25px rgba(0,0,0,0.25);
+}
 
-    .field-group {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 10px;
-    }
+h2 {
+  text-align: center;
+  color: #003b5c;
+}
 
-    input {
-      padding: 10px;
-      border-radius: 5px;
-      border: 1px solid #ccc;
-      font-size: 14px;
-    }
+.field-group {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
 
-    .full { grid-column: span 2; }
+input {
+  padding: 10px;
+  border-radius: 5px;
+  border: 1px solid #ccc;
+}
 
-    button {
-      width: 100%;
-      padding: 12px;
-      margin-top: 12px;
-      background: linear-gradient(135deg, #0079c1, #005e95);
-      color: #fff;
-      border: none;
-      border-radius: 6px;
-      font-size: 15px;
-      cursor: pointer;
-      font-weight: bold;
-    }
+.full { grid-column: span 2; }
 
-    #mapDiv {
-      height: 250px;
-      margin-top: 12px;
-      display: none;
-      border-radius: 8px;
-      overflow: hidden;
-    }
+button {
+  width: 100%;
+  padding: 12px;
+  margin-top: 12px;
+  background: linear-gradient(135deg, #0079c1, #005e95);
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  font-weight: bold;
+}
 
-    #status {
-      margin-top: 10px;
-      text-align: center;
-      font-size: 14px;
-      font-weight: bold;
-    }
+/* 🔑 KEY CHANGE */
+#mapDiv {
+  height: 0;
+  overflow: hidden;
+  transition: height 0.3s ease;
+  margin-top: 10px;
+  border-radius: 8px;
+}
 
-    .footer {
-      margin-top: 20px;
-      text-align: center;
-      border-top: 1px solid #ddd;
-      padding-top: 15px;
-    }
-
-    .footer img {
-      height: 45px;
-      margin-bottom: 6px;
-    }
-
-    .footer-text {
-      font-size: 13px;
-      font-weight: bold;
-      color: #003b5c;
-      letter-spacing: 1px;
-    }
-  </style>
+#status {
+  margin-top: 10px;
+  text-align: center;
+  font-weight: bold;
+}
+</style>
 </head>
 
 <body>
 
 <div class="box">
-  <h2>KALPATARU PROJECTS INTERNATIONAL LIMITED<br>SITE SURVEY</h2>
+<h2>KALPATARU PROJECTS<br>SITE SURVEY</h2>
 
-  <div class="field-group">
-    <input id="CLUSTER" placeholder="Cluster">
-    <input id="SITENAME" placeholder="Site Name">
+<div class="field-group">
+  <input id="CLUSTER" placeholder="Cluster">
+  <input id="SITENAME" placeholder="Site Name">
+  <input type="date" id="DATE">
+  <input id="COMPONENTS" placeholder="Components">
+  <input id="SUB_COMPONENTS" placeholder="Sub Components" class="full">
+  <input id="REMARKS" placeholder="Remarks" class="full">
 
-    <input type="date" id="DATE">
-    <input id="COMPONENTS" placeholder="Components">
+  <!-- CAMERA ONLY -->
+  <input type="file" id="photo" accept="image/*" capture="environment" class="full">
+</div>
 
-    <input id="SUB_COMPONENTS" placeholder="Sub Components" class="full">
-    <input id="REMARKS" placeholder="Remarks" class="full">
+<button onclick="previewLocation()">🗺️ Preview Location</button>
+<button onclick="uploadData()">⬆ Upload Data</button>
 
-    <!-- CAMERA ONLY -->
-    <input
-      type="file"
-      id="photo"
-      accept="image/*"
-      capture="environment"
-      class="full"
-    >
-  </div>
-
-  <!-- TWO BUTTONS -->
-  <button type="button" onclick="previewLocation()">🗺️ Preview Location</button>
-  <button type="button" onclick="uploadData()">⬆ Upload Survey Data</button>
-
-  <div id="mapDiv"></div>
-  <div id="status"></div>
-
-  <div class="footer">
-    <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/4/46/Kalpataru_logo.svg/1024px-Kalpataru_logo.svg.png">
-    <div class="footer-text">KALPATARU WATER TEAM</div>
-  </div>
+<div id="mapDiv"></div>
+<div id="status"></div>
 </div>
 
 <script>
@@ -149,144 +113,103 @@ require([
   "esri/request"
 ], function (Map, MapView, Point, Graphic, esriRequest) {
 
-  const featureUrl =
-    "https://services.arcgis.com/NJ6dRODVurthn1U5/arcgis/rest/services/SITE_LOCATION/FeatureServer/0";
+const featureUrl =
+"https://services.arcgis.com/NJ6dRODVurthn1U5/arcgis/rest/services/SITE_LOCATION/FeatureServer/0";
 
-  let currentGPS = null;
-  let mapView = null;
+let currentGPS = null;
 
-  function getLiveGPS() {
-    return new Promise((resolve, reject) => {
-      navigator.geolocation.getCurrentPosition(
-        pos => resolve({
-          latitude: pos.coords.latitude,
-          longitude: pos.coords.longitude
-        }),
-        () => reject()
-      );
-    });
+/* ✅ MAP CREATED ON PAGE LOAD (KEY FIX) */
+const map = new Map({ basemap: "streets-navigation-vector" });
+
+const mapView = new MapView({
+  container: "mapDiv",
+  map: map,
+  center: [77, 28],
+  zoom: 5
+});
+
+function getLiveGPS() {
+  return new Promise((res, rej) => {
+    navigator.geolocation.getCurrentPosition(
+      p => res({ latitude: p.coords.latitude, longitude: p.coords.longitude }),
+      () => rej()
+    );
+  });
+}
+
+window.previewLocation = async function () {
+  const status = document.getElementById("status");
+  const mapDiv = document.getElementById("mapDiv");
+
+  status.innerText = "📍 Getting live GPS...";
+
+  try {
+    currentGPS = await getLiveGPS();
+  } catch {
+    alert("❌ GPS allow nahi hai");
+    return;
   }
 
-  // 🗺️ PREVIEW LOCATION
-  window.previewLocation = async function () {
-    const status = document.getElementById("status");
-    const file = document.getElementById("photo").files[0];
-    const mapDiv = document.getElementById("mapDiv");
+  /* SHOW MAP */
+  mapDiv.style.height = "250px";
 
-    if (!file) {
-      alert("Pehle camera se photo lo");
-      return;
-    }
+  mapView.center = [currentGPS.longitude, currentGPS.latitude];
+  mapView.zoom = 18;
 
-    status.innerText = "📍 Getting live GPS...";
+  mapView.graphics.removeAll();
+  mapView.graphics.add(new Graphic({
+    geometry: new Point(currentGPS),
+    symbol: { type: "simple-marker", color: "red", size: 12 }
+  }));
 
-    try {
-      currentGPS = await getLiveGPS();
-    } catch {
-      alert("❌ GPS allow nahi hai. Location ON karo.");
-      status.innerText = "";
-      return;
-    }
+  mapView.resize();
+  status.innerText = "🗺️ Location preview ready";
+};
 
-    // 🔴 IMPORTANT FIX: show map BEFORE creating MapView
-    mapDiv.style.display = "block";
+window.uploadData = async function () {
+  if (!currentGPS) {
+    alert("Pehle preview karo");
+    return;
+  }
 
-    setTimeout(() => {
+  const point = new Point({
+    latitude: currentGPS.latitude,
+    longitude: currentGPS.longitude,
+    spatialReference: { wkid: 4326 }
+  });
 
-      if (!mapView) {
-        const map = new Map({ basemap: "streets-navigation-vector" });
-
-        mapView = new MapView({
-          container: mapDiv,
-          map: map,
-          center: [currentGPS.longitude, currentGPS.latitude],
-          zoom: 18
-        });
-      } else {
-        mapView.center = [currentGPS.longitude, currentGPS.latitude];
-      }
-
-      mapView.graphics.removeAll();
-
-      mapView.graphics.add(new Graphic({
-        geometry: new Point({
-          longitude: currentGPS.longitude,
-          latitude: currentGPS.latitude
-        }),
-        symbol: {
-          type: "simple-marker",
-          color: "red",
-          size: 12
-        }
-      }));
-
-      status.innerText = "🗺️ Location preview ready";
-
-    }, 300); // delay is important
+  const attributes = {
+    CLUSTER: CLUSTER.value || "",
+    SITENAME: SITENAME.value || "",
+    DATE_: DATE.value || "",
+    COMPONENTS: COMPONENTS.value || "",
+    SUB_COMPONENTS: SUB_COMPONENTS.value || "",
+    REMARKS: REMARKS.value || ""
   };
 
-  // ⬆ UPLOAD DATA
-  window.uploadData = async function () {
-    const status = document.getElementById("status");
-    const file = document.getElementById("photo").files[0];
-
-    if (!file) {
-      alert("Photo missing");
-      return;
+  const res = await esriRequest(featureUrl + "/addFeatures", {
+    method: "post",
+    query: {
+      f: "json",
+      features: JSON.stringify([{ geometry: point, attributes }])
     }
+  });
 
-    if (!currentGPS) {
-      alert("Pehle Preview Location karo");
-      return;
-    }
+  const oid = res.data.addResults[0].objectId;
+  const file = document.getElementById("photo").files[0];
 
-    status.innerText = "⬆ Uploading data...";
+  const fd = new FormData();
+  fd.append("attachment", file);
+  fd.append("f", "json");
 
-    const point = new Point({
-      latitude: currentGPS.latitude,
-      longitude: currentGPS.longitude,
-      spatialReference: { wkid: 4326 }
-    });
+  await fetch(`${featureUrl}/${oid}/addAttachment`, {
+    method: "POST",
+    body: fd
+  });
 
-    const attributes = {
-      CLUSTER: CLUSTER.value || "",
-      SITENAME: SITENAME.value || "",
-      DATE_: DATE.value || "",
-      COMPONENTS: COMPONENTS.value || "",
-      SUB_COMPONENTS: SUB_COMPONENTS.value || "",
-      REMARKS: REMARKS.value || ""
-    };
-
-    try {
-      const addRes = await esriRequest(featureUrl + "/addFeatures", {
-        method: "post",
-        query: {
-          f: "json",
-          features: JSON.stringify([{ geometry: point, attributes }])
-        }
-      });
-
-      const oid = addRes.data.addResults[0].objectId;
-
-      const fd = new FormData();
-      fd.append("attachment", file);
-      fd.append("f", "json");
-
-      await fetch(`${featureUrl}/${oid}/addAttachment`, {
-        method: "POST",
-        body: fd
-      });
-
-      status.innerHTML = "✅ Photo & Survey Data Uploaded Successfully";
-
-      currentGPS = null;
-      document.getElementById("photo").value = "";
-
-    } catch (e) {
-      console.error(e);
-      status.innerText = "❌ Upload failed";
-    }
-  };
+  document.getElementById("status").innerText =
+    "✅ Photo & Data Uploaded Successfully";
+};
 });
 </script>
 
