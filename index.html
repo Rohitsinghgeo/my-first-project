@@ -11,77 +11,112 @@
 <script src="https://js.arcgis.com/4.29/"></script>
 
 <style>
-*{box-sizing:border-box}
-body{
- margin:0;min-height:100vh;font-family:Arial;
- background:linear-gradient(rgba(0,0,0,.55),rgba(0,0,0,.55)),
- url('https://images.unsplash.com/photo-1500530855697-b586d89ba3ee');
- background-size:cover;
- display:flex;align-items:center;justify-content:center
-}
-.box{
- background:#fff;max-width:420px;width:100%;
- padding:16px;border-radius:14px;
- box-shadow:0 10px 30px rgba(0,0,0,.3)
-}
-h2{text-align:center;font-size:16px;color:#003b5c;margin-bottom:6px}
+* { box-sizing: border-box; }
 
-.field-group{
- display:grid;
- grid-template-columns:1fr 1fr;
- gap:8px
-}
-input,select{
- padding:9px;font-size:14px;
- border-radius:6px;border:1px solid #ccc
-}
-.full{grid-column:span 2}
-
-button{
- width:100%;padding:10px;margin-top:6px;
- font-size:14px;font-weight:bold;
- border-radius:8px;border:none;
- background:linear-gradient(135deg,#0079c1,#005e95);
- color:#fff
-}
-.secondary{background:#555}
-.warning{background:#d97706}
-.reset{background:#444}
-
-.camera-row{
- display:flex;gap:8px
-}
-.camera-row button{width:50%}
-
-video{
- width:100%;
- border-radius:10px;
- margin-top:6px;
- display:none
+body {
+  margin: 0;
+  min-height: 100vh;
+  font-family: Arial, sans-serif;
+  background:
+    linear-gradient(rgba(0,0,0,.55), rgba(0,0,0,.55)),
+    url('https://images.unsplash.com/photo-1500530855697-b586d89ba3ee');
+  background-size: cover;
+  background-position: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
-#mapDiv{
- height:0;margin-top:6px;
- border-radius:10px;
- overflow:hidden
+.box {
+  background: #fff;
+  width: 100%;
+  max-width: 420px;
+  padding: 16px;
+  border-radius: 14px;
+  box-shadow: 0 10px 30px rgba(0,0,0,.3);
 }
-#status{
- text-align:center;
- font-size:13px;
- font-weight:bold;
- margin-top:6px
+
+h2 {
+  text-align: center;
+  font-size: 16px;
+  color: #003b5c;
+  margin-bottom: 8px;
+}
+
+.field-group {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+input, select {
+  width: 100%;
+  padding: 9px;
+  font-size: 14px;
+  border-radius: 6px;
+  border: 1px solid #ccc;
+}
+
+.full { grid-column: span 2; }
+
+button {
+  width: 100%;
+  padding: 10px;
+  margin-top: 6px;
+  font-size: 14px;
+  font-weight: bold;
+  border-radius: 8px;
+  border: none;
+  background: linear-gradient(135deg, #0079c1, #005e95);
+  color: #fff;
+}
+
+.secondary { background: #555; }
+.warning { background: #d97706; }
+.reset { background: #444; }
+
+.camera-row {
+  display: flex;
+  gap: 8px;
+}
+
+.camera-row button {
+  width: 50%;
+}
+
+video {
+  width: 100%;
+  border-radius: 10px;
+  margin-top: 6px;
+  display: none;
+}
+
+#mapDiv {
+  height: 0;
+  margin-top: 6px;
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+#status {
+  margin-top: 6px;
+  text-align: center;
+  font-size: 13px;
+  font-weight: bold;
+  line-height: 1.4;
 }
 </style>
 </head>
 
 <body>
+
 <div class="box">
 <h2>KALPATARU PROJECTS<br>SITE SURVEY</h2>
 
 <!-- CAMERA -->
 <div class="camera-row">
- <button id="cameraToggleBtn" class="secondary">📷 Start Camera</button>
- <button onclick="capturePhoto()">📸 Capture Photo</button>
+  <button id="cameraToggleBtn" class="secondary">📷 Start Camera</button>
+  <button onclick="capturePhoto()">📸 Capture Photo</button>
 </div>
 
 <button id="recaptureBtn" class="warning" style="display:none"
@@ -94,22 +129,22 @@ video{
 
 <!-- FIELD DATA -->
 <div class="field-group">
- <input id="CLUSTER" placeholder="Cluster">
- <input id="SITENAME" placeholder="Site Name">
+  <input id="CLUSTER" placeholder="Cluster">
+  <input id="SITENAME" placeholder="Site Name">
 
- <input type="date" id="DATE">
- <input id="COMPONENTS" placeholder="Components">
+  <input type="date" id="DATE">
+  <input id="COMPONENTS" placeholder="Components">
 
- <input id="SUB_COMPONENTS" class="full" placeholder="Sub Components">
- <input id="REMARKS" class="full" placeholder="Remarks">
+  <input id="SUB_COMPONENTS" class="full" placeholder="Sub Components">
+  <input id="REMARKS" class="full" placeholder="Remarks">
 
- <select id="basemapSelect" class="full">
-  <option value="streets-navigation-vector">Streets</option>
-  <option value="satellite">Satellite</option>
-  <option value="hybrid">Hybrid</option>
-  <option value="topo-vector">Terrain</option>
-  <option value="osm">OpenStreetMap</option>
- </select>
+  <select id="basemapSelect" class="full">
+    <option value="streets-navigation-vector">Streets</option>
+    <option value="satellite">Satellite</option>
+    <option value="hybrid">Hybrid</option>
+    <option value="topo-vector">Terrain</option>
+    <option value="osm">OpenStreetMap</option>
+  </select>
 </div>
 
 <button onclick="previewLocation()">🗺️ Preview Location</button>
@@ -121,162 +156,183 @@ video{
 
 <script>
 require([
- "esri/Map","esri/views/MapView",
- "esri/geometry/Point","esri/geometry/Circle",
- "esri/Graphic"
-], function(Map,MapView,Point,Circle,Graphic){
+  "esri/Map","esri/views/MapView",
+  "esri/geometry/Point","esri/geometry/Circle",
+  "esri/Graphic"
+], function (Map, MapView, Point, Circle, Graphic) {
 
-let cameraStream=null;
-let photoTaken=false;
-let bestGPS=null;
-let accuracyCircle=null;
+let cameraStream = null;
+let photoTaken = false;
+let bestGPS = null;
+let accuracyCircle = null;
 
 /* CAMERA */
-cameraToggleBtn.onclick=async()=>{
- if(!cameraStream){
-  cameraStream=await navigator.mediaDevices.getUserMedia({video:{facingMode:"environment"}});
-  video.srcObject=cameraStream;
-  video.style.display="block";
-  cameraToggleBtn.innerText="⏹ Stop Camera";
- } else stopCamera();
+cameraToggleBtn.onclick = async () => {
+  if (!cameraStream) {
+    cameraStream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: "environment" }
+    });
+    video.srcObject = cameraStream;
+    video.style.display = "block";
+    cameraToggleBtn.innerText = "⏹ Stop Camera";
+  } else stopCamera();
 };
-function stopCamera(){
- cameraStream?.getTracks().forEach(t=>t.stop());
- cameraStream=null;
- video.style.display="none";
- cameraToggleBtn.innerText="📷 Start Camera";
+
+function stopCamera() {
+  cameraStream?.getTracks().forEach(t => t.stop());
+  cameraStream = null;
+  video.style.display = "none";
+  cameraToggleBtn.innerText = "📷 Start Camera";
 }
 
 /* CAPTURE */
-window.capturePhoto=()=>{
- if(!cameraStream){alert("Camera ON karo");return}
- photoTaken=true;
- stopCamera();
- status.innerText="📸 Photo captured";
+window.capturePhoto = () => {
+  if (!cameraStream) {
+    alert("Pehle camera ON karo");
+    return;
+  }
+  photoTaken = true;
+  stopCamera();
+  status.innerText = "📸 Photo captured";
 };
 
-/* HIGH ACCURACY GPS */
-function getGPS(){
- return new Promise((res,rej)=>{
-  navigator.geolocation.getCurrentPosition(
-   p=>res({
-    latitude:p.coords.latitude,
-    longitude:p.coords.longitude,
-    accuracy:Math.round(p.coords.accuracy)
-   }),
-   rej,
-   {enableHighAccuracy:true,timeout:15000,maximumAge:0}
-  )
- })
+/* GPS */
+function getGPS() {
+  return new Promise((resolve, reject) => {
+    navigator.geolocation.getCurrentPosition(
+      p => resolve({
+        latitude: p.coords.latitude,
+        longitude: p.coords.longitude,
+        accuracy: Math.round(p.coords.accuracy)
+      }),
+      reject,
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+    );
+  });
 }
 
 /* MAP */
-const map=new Map({basemap:"satellite"});
-const view=new MapView({
- container:"mapDiv",
- map,
- center:[77,28],
- zoom:5
+const map = new Map({ basemap: "satellite" });
+const view = new MapView({
+  container: "mapDiv",
+  map,
+  center: [77, 28],
+  zoom: 5
 });
-basemapSelect.onchange=e=>map.basemap=e.target.value;
+
+basemapSelect.onchange = e => map.basemap = e.target.value;
 
 /* SMART GPS */
-async function optimizeGPS(){
- let noImprove=0;
- for(let i=1;i<=6;i++){
-  status.innerText=`🔄 Optimizing GPS (${i}/6)`;
-  const g=await getGPS();
-  if(!bestGPS || g.accuracy<bestGPS.accuracy){
-   bestGPS=g; noImprove=0;
-  } else noImprove++;
-  if(bestGPS.accuracy<=10) break;
-  if(noImprove>=2) break;
-  await new Promise(r=>setTimeout(r,2000));
- }
- drawGPS();
-}
+async function optimizeGPS() {
+  let noImprove = 0;
+  for (let i = 1; i <= 6; i++) {
+    status.innerText = `🔄 Optimizing GPS (${i}/6)`;
+    const g = await getGPS();
 
-/* DRAW */
-function drawGPS(){
- mapDiv.style.height="220px";
- view.graphics.removeAll();
- const pt=new Point(bestGPS);
- view.center=pt; view.zoom=18;
+    if (!bestGPS || g.accuracy < bestGPS.accuracy) {
+      bestGPS = g;
+      noImprove = 0;
+    } else {
+      noImprove++;
+    }
 
- view.graphics.add(new Graphic({
-  geometry:pt,
-  symbol:{type:"simple-marker",color:"red",size:10}
- }));
+    if (bestGPS.accuracy <= 10) break;
+    if (noImprove >= 2) break;
 
- accuracyCircle=new Graphic({
-  geometry:new Circle({
-   center:pt,
-   radius:bestGPS.accuracy,
-   radiusUnit:"meters"
-  }),
-  symbol:{
-   type:"simple-fill",
-   color:[255,0,0,0.15],
-   outline:{color:"red",width:1}
+    await new Promise(r => setTimeout(r, 2000));
   }
- });
- view.graphics.add(accuracyCircle);
-
- if(bestGPS.accuracy<=30){
-  status.innerText=`✅ GPS Locked (${bestGPS.accuracy}m)`;
-  recaptureBtn.style.display="none";
- } else {
-  status.innerText=`⚠️ Weak GPS (${bestGPS.accuracy}m) – Tap circle`;
-  recaptureBtn.style.display="block";
- }
+  drawGPS();
 }
 
-/* CIRCLE CLICK = RE-OPTIMIZE */
-view.on("click",async e=>{
- const hit=await view.hitTest(e);
- if(hit.results.some(r=>r.graphic===accuracyCircle)){
-  await optimizeGPS();
- }
+/* DRAW POINT + CIRCLE */
+function drawGPS() {
+  mapDiv.style.height = "220px";
+  view.graphics.removeAll();
+
+  const pt = new Point(bestGPS);
+  view.center = pt;
+  view.zoom = 18;
+
+  view.graphics.add(new Graphic({
+    geometry: pt,
+    symbol: { type: "simple-marker", color: "red", size: 10 }
+  }));
+
+  accuracyCircle = new Graphic({
+    geometry: new Circle({
+      center: pt,
+      radius: bestGPS.accuracy,
+      radiusUnit: "meters"
+    }),
+    symbol: {
+      type: "simple-fill",
+      color: [255, 0, 0, 0.15],
+      outline: { color: "red", width: 1 }
+    }
+  });
+
+  view.graphics.add(accuracyCircle);
+
+  if (bestGPS.accuracy <= 30) {
+    status.innerText =
+      `📍 GPS Accuracy: ${bestGPS.accuracy} m (Good)`;
+    recaptureBtn.style.display = "none";
+  } else {
+    status.innerText =
+      `⚠️ GPS Accuracy: ${bestGPS.accuracy} m (Weak – tap circle)`;
+    recaptureBtn.style.display = "block";
+  }
+}
+
+/* CIRCLE CLICK = IMPROVE GPS */
+view.on("click", async e => {
+  const hit = await view.hitTest(e);
+  if (hit.results.some(r => r.graphic === accuracyCircle)) {
+    await optimizeGPS();
+  }
 });
 
 /* PREVIEW */
-window.previewLocation=async()=>{
- if(!photoTaken){alert("Pehle photo lo");return}
- bestGPS=null;
- await optimizeGPS();
+window.previewLocation = async () => {
+  if (!photoTaken) {
+    alert("Pehle photo lo");
+    return;
+  }
+  bestGPS = null;
+  await optimizeGPS();
 };
 
-/* RESET */
-window.reCapture=()=>{
- photoTaken=false;
- bestGPS=null;
- status.innerText="🔄 Re-capture photo";
+/* RESET / RECAPTURE */
+window.reCapture = () => {
+  photoTaken = false;
+  bestGPS = null;
+  status.innerText = "🔄 Re-capture photo";
 };
 
-window.resetForm=()=>{
- document.querySelectorAll("input").forEach(i=>i.value="");
- bestGPS=null;
- photoTaken=false;
- mapDiv.style.height="0";
- view.graphics.removeAll();
- status.innerText="🧹 Ready for new site";
- resetBtn.style.display="none";
+window.resetForm = () => {
+  document.querySelectorAll("input").forEach(i => i.value = "");
+  photoTaken = false;
+  bestGPS = null;
+  view.graphics.removeAll();
+  mapDiv.style.height = "0";
+  status.innerText = "🧹 Ready for new site";
 };
 
-/* UPLOAD GATE */
-window.uploadData=()=>{
- if(!photoTaken||!bestGPS){
-  alert("Photo + GPS required");
-  return;
- }
- if(bestGPS.accuracy>30){
-  alert("GPS weak – improve first");
-  return;
- }
- resetBtn.style.display="block";
- alert("✅ DATA READY – GIS QUALITY OK");
+/* UPLOAD CHECK */
+window.uploadData = () => {
+  if (!photoTaken || !bestGPS) {
+    alert("Photo + GPS required");
+    return;
+  }
+  if (bestGPS.accuracy > 30) {
+    alert("GPS weak – improve first");
+    return;
+  }
+  resetBtn.style.display = "block";
+  alert("✅ DATA READY – GIS QUALITY OK");
 };
 });
 </script>
+
 </body>
 </html>
