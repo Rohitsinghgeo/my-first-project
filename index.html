@@ -71,6 +71,7 @@
       margin-top: 12px;
       display: none;
       border-radius: 8px;
+      overflow: hidden;
     }
 
     #status {
@@ -166,9 +167,11 @@ require([
     });
   }
 
+  // 🗺️ PREVIEW LOCATION
   window.previewLocation = async function () {
     const status = document.getElementById("status");
     const file = document.getElementById("photo").files[0];
+    const mapDiv = document.getElementById("mapDiv");
 
     if (!file) {
       alert("Pehle camera se photo lo");
@@ -185,28 +188,44 @@ require([
       return;
     }
 
-    document.getElementById("mapDiv").style.display = "block";
+    // 🔴 IMPORTANT FIX: show map BEFORE creating MapView
+    mapDiv.style.display = "block";
 
-    if (!mapView) {
-      const map = new Map({ basemap: "streets-navigation-vector" });
-      mapView = new MapView({
-        container: "mapDiv",
-        map: map,
-        zoom: 18
-      });
-    }
+    setTimeout(() => {
 
-    mapView.graphics.removeAll();
-    mapView.center = [currentGPS.longitude, currentGPS.latitude];
+      if (!mapView) {
+        const map = new Map({ basemap: "streets-navigation-vector" });
 
-    mapView.graphics.add(new Graphic({
-      geometry: new Point(currentGPS),
-      symbol: { type: "simple-marker", color: "red", size: 12 }
-    }));
+        mapView = new MapView({
+          container: mapDiv,
+          map: map,
+          center: [currentGPS.longitude, currentGPS.latitude],
+          zoom: 18
+        });
+      } else {
+        mapView.center = [currentGPS.longitude, currentGPS.latitude];
+      }
 
-    status.innerText = "🗺️ Location preview ready";
+      mapView.graphics.removeAll();
+
+      mapView.graphics.add(new Graphic({
+        geometry: new Point({
+          longitude: currentGPS.longitude,
+          latitude: currentGPS.latitude
+        }),
+        symbol: {
+          type: "simple-marker",
+          color: "red",
+          size: 12
+        }
+      }));
+
+      status.innerText = "🗺️ Location preview ready";
+
+    }, 300); // delay is important
   };
 
+  // ⬆ UPLOAD DATA
   window.uploadData = async function () {
     const status = document.getElementById("status");
     const file = document.getElementById("photo").files[0];
@@ -215,6 +234,7 @@ require([
       alert("Photo missing");
       return;
     }
+
     if (!currentGPS) {
       alert("Pehle Preview Location karo");
       return;
