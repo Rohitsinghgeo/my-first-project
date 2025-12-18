@@ -1,265 +1,197 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <title>SITE_LOCATION – Photo Upload</title>
+<meta charset="UTF-8">
+<title>SITE_LOCATION – Photo Upload</title>
 
-  <!-- ArcGIS JS API -->
-  <link rel="stylesheet" href="https://js.arcgis.com/4.29/esri/themes/light/main.css">
-  <script src="https://js.arcgis.com/4.29/"></script>
+<link rel="stylesheet" href="https://js.arcgis.com/4.29/esri/themes/light/main.css">
+<script src="https://js.arcgis.com/4.29/"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/exif-js/2.3.0/exif.min.js"></script>
 
-  <!-- EXIF JS -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/exif-js/2.3.0/exif.min.js"></script>
-
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      min-height: 100vh;
-      margin: 0;
-      background:
-        linear-gradient(rgba(0,0,0,0.55), rgba(0,0,0,0.55)),
-        url('https://images.unsplash.com/photo-1500530855697-b586d89ba3ee');
-      background-size: cover;
-      background-position: center;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-
-    .box {
-      background: rgba(255,255,255,0.95);
-      padding: 25px;
-      max-width: 520px;
-      width: 100%;
-      border-radius: 10px;
-      box-shadow: 0 8px 25px rgba(0,0,0,0.25);
-    }
-
-    h2 {
-      text-align: center;
-      color: #003b5c;
-      margin-bottom: 20px;
-    }
-
-    .field-group {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 10px;
-    }
-
-    input {
-      padding: 10px;
-      border-radius: 5px;
-      border: 1px solid #ccc;
-      font-size: 14px;
-    }
-
-    .full { grid-column: span 2; }
-
-    button {
-      width: 100%;
-      padding: 12px;
-      margin-top: 15px;
-      background: linear-gradient(135deg, #0079c1, #005e95);
-      color: #fff;
-      border: none;
-      border-radius: 6px;
-      font-size: 15px;
-      cursor: pointer;
-      font-weight: bold;
-    }
-
-    #status {
-      margin-top: 12px;
-      text-align: center;
-      font-size: 14px;
-      font-weight: bold;
-    }
-
-    .footer {
-      margin-top: 20px;
-      text-align: center;
-      border-top: 1px solid #ddd;
-      padding-top: 15px;
-    }
-
-    .footer img {
-      height: 45px;
-      margin-bottom: 6px;
-    }
-
-    .footer-text {
-      font-size: 13px;
-      font-weight: bold;
-      color: #003b5c;
-      letter-spacing: 1px;
-    }
-  </style>
+<style>
+body{
+  font-family:Arial;
+  background:#f4f6f8;
+  padding:10px;
+}
+.box{
+  background:#fff;
+  max-width:550px;
+  margin:auto;
+  padding:20px;
+  border-radius:10px;
+}
+input,button{
+  width:100%;
+  padding:10px;
+  margin-top:8px;
+}
+#mapDiv{
+  height:250px;
+  margin-top:10px;
+  display:none;
+}
+#status{
+  margin-top:10px;
+  font-weight:bold;
+}
+</style>
 </head>
 
 <body>
 
 <div class="box">
-  <h2>KALPATARU PROJECTS INTERNATIONAL LIMITED<br>SITE SURVEY</h2>
+<h3>SITE SURVEY</h3>
 
-  <div class="field-group">
-    <input type="text" id="CLUSTER" placeholder="Cluster">
-    <input type="text" id="SITENAME" placeholder="SITENAME">
+<input id="CLUSTER" placeholder="Cluster">
+<input id="SITENAME" placeholder="Site Name">
+<input type="date" id="DATE">
+<input id="COMPONENTS" placeholder="Components">
+<input id="SUB_COMPONENTS" placeholder="Sub Components">
+<input id="REMARKS" placeholder="Remarks">
 
-    <input type="date" id="DATE" id="DATE">
-    <input type="text" id="COMPONENTS" placeholder="Components">
+<!-- Camera + Gallery -->
+<input type="file" id="photo" accept="image/*">
 
-    <input type="text" id="SUB_COMPONENTS" placeholder="Sub Components" class="full">
-    <input type="text" id="REMARKS" placeholder="Remarks" class="full">
+<div id="mapDiv"></div>
 
-    <!-- Camera + Gallery -->
-    <input
-      type="file"
-      id="photo"
-      accept="image/*"
-      capture="environment"
-      class="full"
-    >
-  </div>
+<button onclick="previewAndUpload()">Preview Location & Upload</button>
 
-  <button onclick="uploadData()">⬆ Upload Survey Data</button>
-
-  <div id="status"></div>
-
-  <div class="footer">
-    <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/4/46/Kalpataru_logo.svg/1024px-Kalpataru_logo.svg.png">
-    <div class="footer-text">KALPATARU WATER TEAM</div>
-  </div>
+<div id="status"></div>
 </div>
 
 <script>
 require([
+  "esri/Map",
+  "esri/views/MapView",
   "esri/geometry/Point",
+  "esri/Graphic",
   "esri/request"
-], function (Point, esriRequest) {
+], function(Map, MapView, Point, Graphic, esriRequest){
 
-  const featureUrl =
-    "https://services.arcgis.com/NJ6dRODVurthn1U5/arcgis/rest/services/SITE_LOCATION/FeatureServer/0";
+const featureUrl =
+"https://services.arcgis.com/NJ6dRODVurthn1U5/arcgis/rest/services/SITE_LOCATION/FeatureServer/0";
 
-  function dmsToDecimal(d, m, s, ref) {
-    let dec = d + m / 60 + s / 3600;
-    return (ref === 'S' || ref === 'W') ? -dec : dec;
+let view;
+
+function rejectBadPhotos(file){
+  const name = file.name.toLowerCase();
+  if(
+    name.includes("screenshot") ||
+    name.includes("whatsapp")
+  ){
+    return true;
   }
+  return false;
+}
 
-  function readGPS(file) {
-    return new Promise((resolve, reject) => {
-      EXIF.getData(file, function () {
-        const lat = EXIF.getTag(this, "GPSLatitude");
-        const lon = EXIF.getTag(this, "GPSLongitude");
-        const latRef = EXIF.getTag(this, "GPSLatitudeRef");
-        const lonRef = EXIF.getTag(this, "GPSLongitudeRef");
+function dmsToDecimal(d,m,s,ref){
+  let dec = d + m/60 + s/3600;
+  return (ref==="S"||ref==="W")?-dec:dec;
+}
 
-        if (!lat || !lon) reject("No EXIF GPS");
-
-        resolve({
-          latitude: dmsToDecimal(lat[0], lat[1], lat[2], latRef),
-          longitude: dmsToDecimal(lon[0], lon[1], lon[2], lonRef)
-        });
+function readGPS(file){
+  return new Promise((res,rej)=>{
+    EXIF.getData(file,function(){
+      const lat = EXIF.getTag(this,"GPSLatitude");
+      const lon = EXIF.getTag(this,"GPSLongitude");
+      const latRef = EXIF.getTag(this,"GPSLatitudeRef");
+      const lonRef = EXIF.getTag(this,"GPSLongitudeRef");
+      if(!lat||!lon) rej();
+      res({
+        latitude:dmsToDecimal(lat[0],lat[1],lat[2],latRef),
+        longitude:dmsToDecimal(lon[0],lon[1],lon[2],lonRef)
       });
     });
+  });
+}
+
+function getLiveGPS(){
+  return new Promise((res,rej)=>{
+    navigator.geolocation.getCurrentPosition(
+      p=>res({latitude:p.coords.latitude,longitude:p.coords.longitude}),
+      ()=>rej()
+    );
+  });
+}
+
+window.previewAndUpload = async function(){
+  const status = document.getElementById("status");
+  const file = document.getElementById("photo").files[0];
+  if(!file){ alert("Photo select karo"); return; }
+
+  // ❌ Reject screenshots / WhatsApp
+  if(rejectBadPhotos(file)){
+    alert("❌ Screenshot / WhatsApp photo allowed nahi hai");
+    return;
   }
 
-  function getLiveGPS() {
-    return new Promise((resolve, reject) => {
-      navigator.geolocation.getCurrentPosition(
-        pos => resolve({
-          latitude: pos.coords.latitude,
-          longitude: pos.coords.longitude
-        }),
-        () => reject("Live GPS denied")
-      );
-    });
-  }
-
-  window.uploadData = async function () {
-    const status = document.getElementById("status");
-    const file = document.getElementById("photo").files[0];
-
-    if (!file) {
-      alert("Photo select karo");
+  let gps=null;
+  try{ gps=await readGPS(file); }
+  catch{
+    try{ gps=await getLiveGPS(); }
+    catch{
+      alert("❌ GPS nahi mila. Upload cancel.");
       return;
     }
+  }
 
-    status.innerText = "📍 Checking Latitude / Longitude...";
+  // 🗺️ MAP PREVIEW
+  document.getElementById("mapDiv").style.display="block";
+  const map = new Map({ basemap:"streets-navigation-vector" });
+  view = new MapView({
+    container:"mapDiv",
+    map:map,
+    center:[gps.longitude,gps.latitude],
+    zoom:18
+  });
 
-    let gps = null;
-
-    // 1️⃣ Try EXIF GPS
-    try {
-      gps = await readGPS(file);
-      status.innerText = "📍 GPS read from Photo (EXIF)";
-    } catch {}
-
-    // 2️⃣ If EXIF not found → Live GPS
-    if (!gps) {
-      try {
-        gps = await getLiveGPS();
-        status.innerText = "📍 GPS read from Device Location";
-      } catch {
-        alert("❌ Is photo ke saath Latitude / Longitude nahi mila. Upload cancel.");
-        status.innerText = "";
-        return;
-      }
+  view.graphics.add(new Graphic({
+    geometry:new Point({longitude:gps.longitude,latitude:gps.latitude}),
+    symbol:{
+      type:"simple-marker",
+      color:"red",
+      size:12
     }
+  }));
 
-    // 3️⃣ Create point
-    const point = new Point({
-      latitude: gps.latitude,
-      longitude: gps.longitude,
-      spatialReference: { wkid: 4326 }
-    });
+  // ⬆ Upload after preview
+  const point = new Point({
+    latitude:gps.latitude,
+    longitude:gps.longitude,
+    spatialReference:{wkid:4326}
+  });
 
-    const attributes = {
-      CLUSTER: CLUSTER.value || "",
-      SITENAME: SITENAME.value || "",
-      DATE_: DATE.value || "",
-      COMPONENTS: COMPONENTS.value || "",
-      SUB_COMPONENTS: SUB_COMPONENTS.value || "",
-      REMARKS: REMARKS.value || ""
-    };
-
-    try {
-      const addRes = await esriRequest(featureUrl + "/addFeatures", {
-        method: "post",
-        query: {
-          f: "json",
-          features: JSON.stringify([{ geometry: point, attributes }])
-        }
-      });
-
-      if (!addRes.data.addResults[0].success) {
-        throw "Feature add failed";
-      }
-
-      const oid = addRes.data.addResults[0].objectId;
-
-      const fd = new FormData();
-      fd.append("attachment", file);
-      fd.append("f", "json");
-
-      await fetch(`${featureUrl}/${oid}/addAttachment`, {
-        method: "POST",
-        body: fd
-      });
-
-      status.innerHTML = `
-        ✅ <b>Photo & Survey Data Uploaded Successfully</b><br>
-        📍 Latitude / Longitude saved<br>
-        📸 Photo attached
-      `;
-
-      document.getElementById("photo").value = "";
-
-    } catch (e) {
-      console.error(e);
-      status.innerText = "❌ Upload failed";
-    }
+  const attributes={
+    CLUSTER:CLUSTER.value||"",
+    SITENAME:SITENAME.value||"",
+    DATE_:DATE.value||"",
+    COMPONENTS:COMPONENTS.value||"",
+    SUB_COMPONENTS:SUB_COMPONENTS.value||"",
+    REMARKS:REMARKS.value||""
   };
+
+  const addRes = await esriRequest(featureUrl+"/addFeatures",{
+    method:"post",
+    query:{
+      f:"json",
+      features:JSON.stringify([{geometry:point,attributes}])
+    }
+  });
+
+  const oid = addRes.data.addResults[0].objectId;
+
+  const fd = new FormData();
+  fd.append("attachment",file);
+  fd.append("f","json");
+
+  await fetch(`${featureUrl}/${oid}/addAttachment`,{
+    method:"POST",
+    body:fd
+  });
+
+  status.innerHTML="✅ Location previewed & uploaded successfully";
+};
 });
 </script>
 
