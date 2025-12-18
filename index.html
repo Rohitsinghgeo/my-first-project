@@ -21,7 +21,6 @@ body {
     linear-gradient(rgba(0,0,0,.55), rgba(0,0,0,.55)),
     url('https://images.unsplash.com/photo-1500530855697-b586d89ba3ee');
   background-size: cover;
-  background-position: center;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -40,7 +39,6 @@ h2 {
   text-align: center;
   font-size: 16px;
   color: #003b5c;
-  margin-bottom: 8px;
 }
 
 .field-group {
@@ -103,22 +101,16 @@ video {
   text-align: center;
   font-size: 13px;
   font-weight: bold;
-  line-height: 1.4;
 }
 
-/* FOOTER BRANDING */
+/* FOOTER */
 .footer {
   margin-top: 14px;
   padding-top: 10px;
   border-top: 1px solid #ddd;
   text-align: center;
 }
-
-.footer img {
-  height: 38px;
-  margin-bottom: 4px;
-}
-
+.footer img { height: 38px; }
 .footer-text {
   font-size: 12px;
   font-weight: bold;
@@ -129,8 +121,8 @@ video {
 </head>
 
 <body>
-
 <div class="box">
+
 <h2>KALPATARU PROJECTS<br>SITE SURVEY</h2>
 
 <!-- CAMERA -->
@@ -151,20 +143,10 @@ video {
 <div class="field-group">
   <input id="CLUSTER" placeholder="Cluster">
   <input id="SITENAME" placeholder="Site Name">
-
   <input type="date" id="DATE">
   <input id="COMPONENTS" placeholder="Components">
-
   <input id="SUB_COMPONENTS" class="full" placeholder="Sub Components">
   <input id="REMARKS" class="full" placeholder="Remarks">
-
-  <select id="basemapSelect" class="full">
-    <option value="streets-navigation-vector">Streets</option>
-    <option value="satellite">Satellite</option>
-    <option value="hybrid">Hybrid</option>
-    <option value="topo-vector">Terrain</option>
-    <option value="osm">OpenStreetMap</option>
-  </select>
 </div>
 
 <button onclick="previewLocation()">🗺️ Preview Location</button>
@@ -173,27 +155,43 @@ video {
 <div id="mapDiv"></div>
 <div id="status"></div>
 
-<!-- FOOTER -->
 <div class="footer">
-  <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/4/46/Kalpataru_logo.svg/1024px-Kalpataru_logo.svg.png?20210728073518"
-       alt="Kalpataru Logo">
+  <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/4/46/Kalpataru_logo.svg/1024px-Kalpataru_logo.svg.png">
   <div class="footer-text">KALPATARU WATER TEAM</div>
 </div>
+
 </div>
 
 <script>
 require([
   "esri/Map","esri/views/MapView",
-  "esri/geometry/Point","esri/geometry/Circle",
-  "esri/Graphic"
-], function (Map, MapView, Point, Circle, Graphic) {
+  "esri/geometry/Point","esri/Graphic",
+  "esri/request",
+  "esri/identity/OAuthInfo",
+  "esri/identity/IdentityManager"
+], function (
+  Map, MapView, Point, Graphic,
+  esriRequest, OAuthInfo, esriId
+) {
 
+/* ================== CONFIG ================== */
+const FEATURE_URL =
+"https://services.arcgis.com/NJ6dRODVurthn1U5/arcgis/rest/services/SITE_LOCATION/FeatureServer/0";
+
+const CLIENT_ID = "eTivrXGOGm2NxME8";
+
+/* ================== OAUTH ================== */
+esriId.registerOAuthInfos([ new OAuthInfo({
+  appId: CLIENT_ID,
+  popup: false
+})]);
+
+/* ================== STATE ================== */
 let cameraStream = null;
 let photoTaken = false;
-let bestGPS = null;
-let accuracyCircle = null;
+let gpsPoint = null;
 
-/* CAMERA */
+/* ================== CAMERA ================== */
 cameraToggleBtn.onclick = async () => {
   if (!cameraStream) {
     cameraStream = await navigator.mediaDevices.getUserMedia({
@@ -212,7 +210,6 @@ function stopCamera() {
   cameraToggleBtn.innerText = "📷 Start Camera";
 }
 
-/* CAPTURE */
 window.capturePhoto = () => {
   if (!cameraStream) {
     alert("Pehle camera ON karo");
@@ -223,7 +220,7 @@ window.capturePhoto = () => {
   status.innerText = "📸 Photo captured";
 };
 
-/* GPS */
+/* ================== GPS ================== */
 function getGPS() {
   return new Promise((resolve, reject) => {
     navigator.geolocation.getCurrentPosition(
@@ -238,7 +235,7 @@ function getGPS() {
   });
 }
 
-/* MAP */
+/* ================== MAP ================== */
 const map = new Map({ basemap: "satellite" });
 const view = new MapView({
   container: "mapDiv",
@@ -247,36 +244,25 @@ const view = new MapView({
   zoom: 5
 });
 
-basemapSelect.onchange = e => map.basemap = e.target.value;
-
-/* SMART GPS */
-async function optimizeGPS() {
-  let noImprove = 0;
-  for (let i = 1; i <= 6; i++) {
-    status.innerText = `🔄 Optimizing GPS (${i}/6)`;
-    const g = await getGPS();
-
-    if (!bestGPS || g.accuracy < bestGPS.accuracy) {
-      bestGPS = g;
-      noImprove = 0;
-    } else {
-      noImprove++;
-    }
-
-    if (bestGPS.accuracy <= 10) break;
-    if (noImprove >= 2) break;
-
-    await new Promise(r => setTimeout(r, 2000));
+/* ================== PREVIEW ================== */
+window.previewLocation = async () => {
+  if (!photoTaken) {
+    alert("Pehle photo lo");
+    return;
   }
-  drawGPS();
-}
 
-/* DRAW */
-function drawGPS() {
+  status.innerText = "📍 Getting GPS...";
+  gpsPoint = await getGPS();
+
   mapDiv.style.height = "220px";
   view.graphics.removeAll();
 
-  const pt = new Point(bestGPS);
+  const pt = new Point({
+    latitude: gpsPoint.latitude,
+    longitude: gpsPoint.longitude,
+    spatialReference: { wkid: 4326 }
+  });
+
   view.center = pt;
   view.zoom = 18;
 
@@ -285,76 +271,77 @@ function drawGPS() {
     symbol: { type: "simple-marker", color: "red", size: 10 }
   }));
 
-  accuracyCircle = new Graphic({
-    geometry: new Circle({
-      center: pt,
-      radius: bestGPS.accuracy,
-      radiusUnit: "meters"
-    }),
-    symbol: {
-      type: "simple-fill",
-      color: [255, 0, 0, 0.15],
-      outline: { color: "red", width: 1 }
+  status.innerText =
+    `📍 GPS Accuracy: ${gpsPoint.accuracy} m`;
+};
+
+/* ================== UPLOAD ================== */
+window.uploadData = async () => {
+
+  if (!photoTaken || !gpsPoint) {
+    alert("Photo aur GPS dono zaroori hain");
+    return;
+  }
+
+  if (gpsPoint.accuracy > 30) {
+    alert("GPS accuracy weak hai, thoda wait karke try karo");
+    return;
+  }
+
+  status.innerText = "⬆ Uploading to ArcGIS Online...";
+
+  /* LOGIN */
+  await esriId.checkSignInStatus(
+    "https://www.arcgis.com/sharing"
+  ).catch(() =>
+    esriId.getCredential("https://www.arcgis.com/sharing")
+  );
+
+  const point = new Point({
+    latitude: gpsPoint.latitude,
+    longitude: gpsPoint.longitude,
+    spatialReference: { wkid: 4326 }
+  });
+
+  const attributes = {
+    CLUSTER: CLUSTER.value,
+    SITENAME: SITENAME.value,
+    DATE_: DATE.value,
+    COMPONENTS: COMPONENTS.value,
+    SUB_COMPONENTS: SUB_COMPONENTS.value,
+    REMARKS: REMARKS.value
+  };
+
+  const res = await esriRequest(FEATURE_URL + "/addFeatures", {
+    method: "post",
+    query: {
+      f: "json",
+      features: JSON.stringify([{ geometry: point, attributes }])
     }
   });
 
-  view.graphics.add(accuracyCircle);
-
-  if (bestGPS.accuracy <= 30) {
-    status.innerText = `📍 GPS Accuracy: ${bestGPS.accuracy} m (Good)`;
-    recaptureBtn.style.display = "none";
+  if (res.data.addResults[0].success) {
+    status.innerText = "✅ Upload successful! Data added to ArcGIS Online";
+    resetBtn.style.display = "block";
   } else {
-    status.innerText = `⚠️ GPS Accuracy: ${bestGPS.accuracy} m (Weak – tap circle)`;
-    recaptureBtn.style.display = "block";
+    status.innerText = "❌ Upload failed";
   }
-}
-
-/* CIRCLE CLICK = IMPROVE GPS */
-view.on("click", async e => {
-  const hit = await view.hitTest(e);
-  if (hit.results.some(r => r.graphic === accuracyCircle)) {
-    await optimizeGPS();
-  }
-});
-
-/* PREVIEW */
-window.previewLocation = async () => {
-  if (!photoTaken) {
-    alert("Pehle photo lo");
-    return;
-  }
-  bestGPS = null;
-  await optimizeGPS();
 };
 
-/* RESET / RECAPTURE */
+/* ================== RESET ================== */
 window.reCapture = () => {
   photoTaken = false;
-  bestGPS = null;
+  gpsPoint = null;
   status.innerText = "🔄 Re-capture photo";
 };
 
 window.resetForm = () => {
   document.querySelectorAll("input").forEach(i => i.value = "");
   photoTaken = false;
-  bestGPS = null;
+  gpsPoint = null;
   view.graphics.removeAll();
   mapDiv.style.height = "0";
   status.innerText = "🧹 Ready for new site";
-};
-
-/* UPLOAD CHECK */
-window.uploadData = () => {
-  if (!photoTaken || !bestGPS) {
-    alert("Photo + GPS required");
-    return;
-  }
-  if (bestGPS.accuracy > 30) {
-    alert("GPS weak – improve first");
-    return;
-  }
-  resetBtn.style.display = "block";
-  alert("✅ DATA READY – GIS QUALITY OK");
 };
 });
 </script>
