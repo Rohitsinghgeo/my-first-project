@@ -49,7 +49,7 @@ h2 {
   gap: 8px;
 }
 
-input {
+input, select {
   width: 100%;
   padding: 9px;
   font-size: 14px;
@@ -119,10 +119,8 @@ canvas { display: none; }
 <div class="box">
 <h2>KALPATARU PROJECTS<br>SITE SURVEY</h2>
 
-<!-- 🎥 CAMERA ON/OFF BUTTON -->
-<button id="cameraToggleBtn" class="secondary">
-📷 Start Camera
-</button>
+<!-- 🎥 CAMERA ON / OFF -->
+<button id="cameraToggleBtn" class="secondary">📷 Start Camera</button>
 
 <video id="video" autoplay playsinline style="display:none;"></video>
 <canvas id="canvas"></canvas>
@@ -136,6 +134,15 @@ canvas { display: none; }
   <input id="COMPONENTS" placeholder="Components">
   <input id="SUB_COMPONENTS" placeholder="Sub Components" class="full">
   <input id="REMARKS" placeholder="Remarks" class="full">
+
+  <!-- 🗺️ Basemap options -->
+  <select id="basemapSelect" class="full">
+    <option value="streets-navigation-vector">Streets</option>
+    <option value="satellite">Satellite</option>
+    <option value="hybrid">Hybrid</option>
+    <option value="topo-vector">Terrain</option>
+    <option value="osm">OpenStreetMap</option>
+  </select>
 </div>
 
 <button onclick="previewLocation()">🗺️ Preview Location</button>
@@ -185,13 +192,12 @@ toggleBtn.addEventListener("click", async () => {
   } else {
     cameraStream.getTracks().forEach(t => t.stop());
     cameraStream = null;
-    video.srcObject = null;
     video.style.display = "none";
     toggleBtn.innerText = "📷 Start Camera";
   }
 });
 
-/* 📸 CAPTURE PHOTO */
+/* 📸 CAPTURE PHOTO (HIDE CAMERA AFTER CAPTURE) */
 window.capturePhoto = function () {
   if (!cameraStream) {
     alert("Pehle camera ON karo");
@@ -199,20 +205,25 @@ window.capturePhoto = function () {
   }
 
   const canvas = document.getElementById("canvas");
+  const status = document.getElementById("status");
+
   canvas.width = video.videoWidth;
   canvas.height = video.videoHeight;
   canvas.getContext("2d").drawImage(video, 0, 0);
 
-  canvas.style.display = "block";
-  video.style.display = "none";
-
   canvas.toBlob(blob => {
     photoBlob = blob;
-    document.getElementById("status").innerText = "📸 Photo captured";
+    status.innerText = "📸 Photo captured successfully";
   }, "image/jpeg");
 
+  // 🔑 UX FIX: hide camera & photo
+  video.style.display = "none";
+  canvas.style.display = "none";
+
+  // stop camera
   cameraStream.getTracks().forEach(t => t.stop());
   cameraStream = null;
+
   toggleBtn.innerText = "📷 Start Camera";
 };
 
@@ -236,6 +247,11 @@ const view = new MapView({
   map: map,
   center: [77, 28],
   zoom: 5
+});
+
+/* BASEMAP CHANGE */
+document.getElementById("basemapSelect").addEventListener("change", e => {
+  map.basemap = e.target.value;
 });
 
 /* 🗺️ PREVIEW LOCATION */
