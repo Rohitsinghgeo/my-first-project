@@ -71,16 +71,10 @@ button {
   color: #fff;
 }
 
-/* 🔹 SMALL CAMERA PERMISSION BUTTON */
-.permission-btn {
-  padding: 6px 10px;
-  font-size: 12.5px;
-  margin-top: 4px;
-  border-radius: 6px;
+button.secondary {
   background: #555;
 }
 
-/* CAMERA PREVIEW */
 video, canvas {
   width: 100%;
   border-radius: 10px;
@@ -89,7 +83,6 @@ video, canvas {
 
 canvas { display: none; }
 
-/* MAP */
 #mapDiv {
   height: 0;
   margin-top: 6px;
@@ -126,17 +119,12 @@ canvas { display: none; }
 <div class="box">
 <h2>KALPATARU PROJECTS<br>SITE SURVEY</h2>
 
-<!-- 🔐 SMALL CAMERA PERMISSION BUTTON -->
-<button id="cameraPermissionBtn" class="permission-btn">
-📷 Allow Camera Access
+<!-- 🎥 CAMERA ON/OFF BUTTON -->
+<button id="cameraToggleBtn" class="secondary">
+📷 Start Camera
 </button>
 
-<small style="display:block;text-align:center;color:#555;">
-Camera access allow karna zaroori hai
-</small>
-
-<!-- 🎥 LIVE CAMERA -->
-<video id="video" autoplay playsinline></video>
+<video id="video" autoplay playsinline style="display:none;"></video>
 <canvas id="canvas"></canvas>
 
 <button onclick="capturePhoto()">📸 Capture Photo</button>
@@ -174,43 +162,43 @@ require([
 const featureUrl =
 "https://services.arcgis.com/NJ6dRODVurthn1U5/arcgis/rest/services/SITE_LOCATION/FeatureServer/0";
 
-let currentGPS = null;
+let cameraStream = null;
 let photoBlob = null;
-let cameraAllowed = false;
+let currentGPS = null;
 
-/* 🔐 CAMERA PERMISSION */
-document.getElementById("cameraPermissionBtn").addEventListener("click", async () => {
-  try {
-    const stream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: "environment" }
-    });
-    stream.getTracks().forEach(t => t.stop());
-    cameraAllowed = true;
-    alert("✅ Camera access allowed");
-  } catch {
-    alert("❌ Camera access denied");
+/* 🎥 CAMERA TOGGLE */
+const video = document.getElementById("video");
+const toggleBtn = document.getElementById("cameraToggleBtn");
+
+toggleBtn.addEventListener("click", async () => {
+  if (!cameraStream) {
+    try {
+      cameraStream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: "environment" }
+      });
+      video.srcObject = cameraStream;
+      video.style.display = "block";
+      toggleBtn.innerText = "⏹ Stop Camera";
+    } catch {
+      alert("❌ Camera access denied");
+    }
+  } else {
+    cameraStream.getTracks().forEach(t => t.stop());
+    cameraStream = null;
+    video.srcObject = null;
+    video.style.display = "none";
+    toggleBtn.innerText = "📷 Start Camera";
   }
-});
-
-/* 🎥 CAMERA PREVIEW */
-navigator.mediaDevices.getUserMedia({
-  video: { facingMode: "environment" }
-}).then(stream => {
-  document.getElementById("video").srcObject = stream;
-}).catch(() => {
-  alert("❌ Camera access required");
 });
 
 /* 📸 CAPTURE PHOTO */
 window.capturePhoto = function () {
-  if (!cameraAllowed) {
-    alert("Pehle Allow Camera Access dabao");
+  if (!cameraStream) {
+    alert("Pehle camera ON karo");
     return;
   }
 
-  const video = document.getElementById("video");
   const canvas = document.getElementById("canvas");
-
   canvas.width = video.videoWidth;
   canvas.height = video.videoHeight;
   canvas.getContext("2d").drawImage(video, 0, 0);
@@ -222,9 +210,13 @@ window.capturePhoto = function () {
     photoBlob = blob;
     document.getElementById("status").innerText = "📸 Photo captured";
   }, "image/jpeg");
+
+  cameraStream.getTracks().forEach(t => t.stop());
+  cameraStream = null;
+  toggleBtn.innerText = "📷 Start Camera";
 };
 
-/* 📍 LIVE GPS */
+/* 📍 GPS */
 function getLiveGPS() {
   return new Promise((resolve, reject) => {
     navigator.geolocation.getCurrentPosition(
