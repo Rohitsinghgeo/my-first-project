@@ -71,15 +71,22 @@ button {
   color: #fff;
 }
 
-button.secondary {
-  background: #555;
+button.secondary { background:#555; }
+button.warning { background:#d97706; }
+button.reset { background:#444; }
+
+.camera-row {
+  display: flex;
+  gap: 8px;
 }
+
+.camera-row button { width:50%; }
 
 video {
   width: 100%;
   border-radius: 10px;
   margin-top: 6px;
-  display: none;
+  display:none;
 }
 
 #mapDiv {
@@ -87,7 +94,6 @@ video {
   margin-top: 6px;
   border-radius: 10px;
   overflow: hidden;
-  transition: height 0.3s ease;
 }
 
 #status {
@@ -95,20 +101,6 @@ video {
   text-align: center;
   font-size: 13px;
   font-weight: bold;
-}
-
-.footer {
-  margin-top: 8px;
-  text-align: center;
-  border-top: 1px solid #ddd;
-  padding-top: 6px;
-}
-
-.footer img { height: 32px; }
-.footer-text {
-  font-size: 12px;
-  font-weight: bold;
-  color: #003b5c;
 }
 </style>
 </head>
@@ -118,10 +110,18 @@ video {
 <div class="box">
 <h2>KALPATARU PROJECTS<br>SITE SURVEY</h2>
 
-<!-- 📷 CAMERA CONTROL -->
-<button id="cameraToggleBtn" class="secondary">📷 Start Camera</button>
+<div class="camera-row">
+  <button id="cameraToggleBtn" class="secondary">📷 Start Camera</button>
+  <button onclick="capturePhoto()">📸 Capture Photo</button>
+</div>
+
+<button id="recaptureBtn" class="warning" style="display:none;"
+        onclick="reCapture()">🔄 Re-Capture Photo</button>
+
+<button id="resetBtn" class="reset" style="display:none;"
+        onclick="resetForm()">🧹 New Site</button>
+
 <video id="video" autoplay playsinline></video>
-<button onclick="capturePhoto()">📸 Capture Photo</button>
 
 <div class="field-group">
   <input id="CLUSTER" placeholder="Cluster">
@@ -131,7 +131,6 @@ video {
   <input id="SUB_COMPONENTS" placeholder="Sub Components" class="full">
   <input id="REMARKS" placeholder="Remarks" class="full">
 
-  <!-- MAP TYPE -->
   <select id="basemapSelect" class="full">
     <option value="streets-navigation-vector">Streets</option>
     <option value="satellite">Satellite</option>
@@ -142,227 +141,132 @@ video {
 </div>
 
 <button onclick="previewLocation()">🗺️ Preview Location</button>
-<button onclick="recheckGPS()">🔄 Re-check GPS</button>
 <button onclick="uploadData()">⬆ Upload Data</button>
 
 <div id="mapDiv"></div>
 <div id="status"></div>
-
-<div class="footer">
-  <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/4/46/Kalpataru_logo.svg/1024px-Kalpataru_logo.svg.png">
-  <div class="footer-text">KALPATARU WATER TEAM</div>
-</div>
 </div>
 
 <script>
 require([
-  "esri/Map",
-  "esri/views/MapView",
-  "esri/geometry/Point",
-  "esri/geometry/Circle",
-  "esri/Graphic",
-  "esri/request"
+  "esri/Map","esri/views/MapView",
+  "esri/geometry/Point","esri/geometry/Circle",
+  "esri/Graphic","esri/request"
 ], function (Map, MapView, Point, Circle, Graphic, esriRequest) {
 
-const featureUrl =
-"https://services.arcgis.com/NJ6dRODVurthn1U5/arcgis/rest/services/SITE_LOCATION/FeatureServer/0";
+let cameraStream=null, photoBlob=null, currentGPS=null;
 
-let cameraStream = null;
-let photoBlob = null;
-let currentGPS = null;
+const video=document.getElementById("video");
+const toggleBtn=document.getElementById("cameraToggleBtn");
+const recaptureBtn=document.getElementById("recaptureBtn");
+const resetBtn=document.getElementById("resetBtn");
 
-/* CAMERA TOGGLE */
-const video = document.getElementById("video");
-const toggleBtn = document.getElementById("cameraToggleBtn");
+/* CAMERA ON/OFF */
+toggleBtn.onclick=async()=>{
+  if(!cameraStream){
+    cameraStream=await navigator.mediaDevices.getUserMedia({video:{facingMode:"environment"}});
+    video.srcObject=cameraStream;
+    video.style.display="block";
+    toggleBtn.innerText="⏹ Stop Camera";
+  } else stopCamera();
+};
 
-toggleBtn.addEventListener("click", async () => {
-  if (!cameraStream) {
-    try {
-      cameraStream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: "environment" }
-      });
-      video.srcObject = cameraStream;
-      video.style.display = "block";
-      toggleBtn.innerText = "⏹ Stop Camera";
-    } catch {
-      alert("❌ Camera access denied");
-    }
-  } else {
-    stopCamera();
+function stopCamera(){
+  if(cameraStream){
+    cameraStream.getTracks().forEach(t=>t.stop());
+    cameraStream=null;
   }
-});
-
-function stopCamera() {
-  if (cameraStream) {
-    cameraStream.getTracks().forEach(t => t.stop());
-    cameraStream = null;
-  }
-  video.style.display = "none";
-  toggleBtn.innerText = "📷 Start Camera";
+  video.style.display="none";
+  toggleBtn.innerText="📷 Start Camera";
 }
 
-/* CAPTURE PHOTO */
-window.capturePhoto = function () {
-  if (!cameraStream) {
-    alert("Pehle camera ON karo");
-    return;
-  }
+/* CAPTURE */
+window.capturePhoto=()=>{
+  if(!cameraStream){ alert("Camera ON karo"); return; }
 
-  const canvas = document.createElement("canvas");
-  canvas.width = video.videoWidth;
-  canvas.height = video.videoHeight;
-  canvas.getContext("2d").drawImage(video, 0, 0);
+  const c=document.createElement("canvas");
+  c.width=video.videoWidth; c.height=video.videoHeight;
+  c.getContext("2d").drawImage(video,0,0);
 
-  canvas.toBlob(blob => {
-    photoBlob = blob;
-    document.getElementById("status").innerText = "📸 Photo captured";
-  }, "image/jpeg");
+  c.toBlob(b=>{
+    photoBlob=b;
+    document.getElementById("status").innerText="📸 Photo captured";
+  },"image/jpeg");
 
   stopCamera();
 };
 
-/* 🔥 HIGH ACCURACY GPS */
-function getLiveGPS() {
-  return new Promise((resolve, reject) => {
+/* GPS */
+function getLiveGPS(){
+  return new Promise((res,rej)=>{
     navigator.geolocation.getCurrentPosition(
-      pos => resolve({
-        latitude: pos.coords.latitude,
-        longitude: pos.coords.longitude,
-        accuracy: Math.round(pos.coords.accuracy)
+      p=>res({
+        latitude:p.coords.latitude,
+        longitude:p.coords.longitude,
+        accuracy:Math.round(p.coords.accuracy)
       }),
-      err => reject(err),
-      {
-        enableHighAccuracy: true,
-        timeout: 15000,
-        maximumAge: 0
-      }
+      rej,
+      {enableHighAccuracy:true,timeout:15000,maximumAge:0}
     );
   });
 }
 
-/* MAP INIT */
-const map = new Map({ basemap: "streets-navigation-vector" });
-const view = new MapView({
-  container: "mapDiv",
-  map: map,
-  center: [77, 28],
-  zoom: 5
-});
+/* MAP */
+const map=new Map({basemap:"streets-navigation-vector"});
+const view=new MapView({container:"mapDiv",map,center:[77,28],zoom:5});
+basemapSelect.onchange=e=>map.basemap=e.target.value;
 
-document.getElementById("basemapSelect")
-  .addEventListener("change", e => map.basemap = e.target.value);
-
-/* PREVIEW LOCATION */
-window.previewLocation = async function () {
-  if (!photoBlob) {
-    alert("Pehle photo capture karo");
-    return;
-  }
-
-  document.getElementById("status").innerText = "📍 Getting GPS...";
-
-  try {
-    currentGPS = await getLiveGPS();
-  } catch {
-    alert("❌ GPS allow nahi hai");
-    return;
-  }
-
-  document.getElementById("mapDiv").style.height = "220px";
-
-  const center = new Point({
-    latitude: currentGPS.latitude,
-    longitude: currentGPS.longitude
-  });
-
-  view.center = center;
-  view.zoom = 18;
+/* PREVIEW */
+window.previewLocation=async()=>{
+  if(!photoBlob){alert("Photo lo");return;}
+  currentGPS=await getLiveGPS();
+  mapDiv.style.height="220px";
   view.graphics.removeAll();
 
-  /* Point */
+  const pt=new Point(currentGPS);
+  view.center=pt; view.zoom=18;
+
+  view.graphics.add(new Graphic({geometry:pt,
+    symbol:{type:"simple-marker",color:"red",size:10}}));
+
   view.graphics.add(new Graphic({
-    geometry: center,
-    symbol: { type: "simple-marker", color: "red", size: 10 }
+    geometry:new Circle({center:pt,radius:currentGPS.accuracy,radiusUnit:"meters"}),
+    symbol:{type:"simple-fill",color:[255,0,0,0.15],outline:{color:"red"}}
   }));
 
-  /* Accuracy Circle */
-  view.graphics.add(new Graphic({
-    geometry: new Circle({
-      center: center,
-      radius: currentGPS.accuracy,
-      radiusUnit: "meters"
-    }),
-    symbol: {
-      type: "simple-fill",
-      color: [255, 0, 0, 0.15],
-      outline: { color: "red", width: 1 }
-    }
-  }));
-
-  view.resize();
-
-  document.getElementById("status").innerText =
-    `📍 Accuracy: ${currentGPS.accuracy} meters`;
+  if(currentGPS.accuracy>30){
+    recaptureBtn.style.display="block";
+    document.getElementById("status").innerText=
+      `⚠️ Weak GPS (${currentGPS.accuracy}m) – Re-capture recommended`;
+  } else {
+    recaptureBtn.style.display="none";
+    document.getElementById("status").innerText=
+      `✅ GPS OK (${currentGPS.accuracy}m)`;
+  }
 };
 
-/* 🔄 RE-CHECK GPS */
-window.recheckGPS = function () {
-  currentGPS = null;
-  previewLocation();
+/* RE-CAPTURE */
+window.reCapture=()=>{
+  photoBlob=null; currentGPS=null;
+  document.getElementById("status").innerText="🔄 Re-capture photo";
 };
 
-/* ⛔ UPLOAD WITH ACCURACY CHECK */
-window.uploadData = async function () {
-  if (!photoBlob || !currentGPS) {
-    alert("Photo + Location required");
-    return;
-  }
+/* RESET FOR NEW SITE */
+window.resetForm=()=>{
+  document.querySelectorAll("input").forEach(i=>i.value="");
+  photoBlob=null; currentGPS=null;
+  mapDiv.style.height="0";
+  view.graphics.removeAll();
+  recaptureBtn.style.display="none";
+  document.getElementById("status").innerText="🧹 Ready for new site";
+};
 
-  if (currentGPS.accuracy > 30) {
-    alert(
-      "❌ GPS accuracy weak hai (" +
-      currentGPS.accuracy +
-      "m). Open area me jaakar Re-check GPS karo."
-    );
-    return;
-  }
-
-  const point = new Point({
-    latitude: currentGPS.latitude,
-    longitude: currentGPS.longitude,
-    spatialReference: { wkid: 4326 }
-  });
-
-  const attributes = {
-    CLUSTER: CLUSTER.value || "",
-    SITENAME: SITENAME.value || "",
-    DATE_: DATE.value || "",
-    COMPONENTS: COMPONENTS.value || "",
-    SUB_COMPONENTS: SUB_COMPONENTS.value || "",
-    REMARKS: REMARKS.value || ""
-  };
-
-  const res = await esriRequest(featureUrl + "/addFeatures", {
-    method: "post",
-    query: {
-      f: "json",
-      features: JSON.stringify([{ geometry: point, attributes }])
-    }
-  });
-
-  const oid = res.data.addResults[0].objectId;
-
-  const fd = new FormData();
-  fd.append("attachment", photoBlob, "camera.jpg");
-  fd.append("f", "json");
-
-  await fetch(`${featureUrl}/${oid}/addAttachment`, {
-    method: "POST",
-    body: fd
-  });
-
-  document.getElementById("status").innerText =
-    "✅ Photo & Location uploaded successfully";
+/* UPLOAD (accuracy gate) */
+window.uploadData=()=>{
+  if(!photoBlob||!currentGPS){alert("Photo + GPS chahiye");return;}
+  if(currentGPS.accuracy>30){alert("GPS weak – Re-capture karo");return;}
+  resetBtn.style.display="block";
+  alert("✅ Upload allowed (logic ready)");
 };
 });
 </script>
