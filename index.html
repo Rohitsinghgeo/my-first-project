@@ -12,7 +12,6 @@
 
 <style>
 * { box-sizing: border-box; }
-
 body {
   margin: 0;
   min-height: 100vh;
@@ -25,7 +24,6 @@ body {
   align-items: center;
   justify-content: center;
 }
-
 .box {
   background: #fff;
   width: 100%;
@@ -34,29 +32,24 @@ body {
   border-radius: 14px;
   box-shadow: 0 10px 30px rgba(0,0,0,.3);
 }
-
 h2 {
   text-align: center;
   font-size: 16px;
   color: #003b5c;
 }
-
 .field-group {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 8px;
 }
-
-input, select {
+input {
   width: 100%;
   padding: 9px;
   font-size: 14px;
   border-radius: 6px;
   border: 1px solid #ccc;
 }
-
 .full { grid-column: span 2; }
-
 button {
   width: 100%;
   padding: 10px;
@@ -68,42 +61,27 @@ button {
   background: linear-gradient(135deg, #0079c1, #005e95);
   color: #fff;
 }
-
 .secondary { background: #555; }
-.warning { background: #d97706; }
-.reset { background: #444; }
-
-.camera-row {
-  display: flex;
-  gap: 8px;
-}
-
-.camera-row button {
-  width: 50%;
-}
-
+.camera-row { display: flex; gap: 8px; }
+.camera-row button { width: 50%; }
 video {
   width: 100%;
   border-radius: 10px;
   margin-top: 6px;
   display: none;
 }
-
 #mapDiv {
   height: 0;
   margin-top: 6px;
   border-radius: 10px;
   overflow: hidden;
 }
-
 #status {
   margin-top: 6px;
   text-align: center;
   font-size: 13px;
   font-weight: bold;
 }
-
-/* FOOTER */
 .footer {
   margin-top: 14px;
   padding-top: 10px;
@@ -115,7 +93,6 @@ video {
   font-size: 12px;
   font-weight: bold;
   color: #003b5c;
-  letter-spacing: 1px;
 }
 </style>
 </head>
@@ -125,21 +102,13 @@ video {
 
 <h2>KALPATARU PROJECTS<br>SITE SURVEY</h2>
 
-<!-- CAMERA -->
 <div class="camera-row">
   <button id="cameraToggleBtn" class="secondary">📷 Start Camera</button>
   <button onclick="capturePhoto()">📸 Capture Photo</button>
 </div>
 
-<button id="recaptureBtn" class="warning" style="display:none"
- onclick="reCapture()">🔄 Re-Capture Photo</button>
-
-<button id="resetBtn" class="reset" style="display:none"
- onclick="resetForm()">🧹 New Site</button>
-
 <video id="video" autoplay playsinline></video>
 
-<!-- FIELD DATA -->
 <div class="field-group">
   <input id="CLUSTER" placeholder="Cluster">
   <input id="SITENAME" placeholder="Site Name">
@@ -174,24 +143,22 @@ require([
   esriRequest, OAuthInfo, esriId
 ) {
 
-/* ================== CONFIG ================== */
+/* ================= CONFIG ================= */
 const FEATURE_URL =
 "https://services.arcgis.com/NJ6dRODVurthn1U5/arcgis/rest/services/SITE_LOCATION/FeatureServer/0";
 
-const CLIENT_ID = "eTivrXGOGm2NxME8";
-
-/* ================== OAUTH ================== */
+/* CLIENT ID (KEPT – NO LOGIN ENFORCED) */
 esriId.registerOAuthInfos([ new OAuthInfo({
-  appId: CLIENT_ID,
+  appId: "eTivrXGOGm2NxME8",
   popup: false
 })]);
 
-/* ================== STATE ================== */
+/* ================= STATE ================= */
 let cameraStream = null;
 let photoTaken = false;
 let gpsPoint = null;
 
-/* ================== CAMERA ================== */
+/* ================= CAMERA ================= */
 cameraToggleBtn.onclick = async () => {
   if (!cameraStream) {
     cameraStream = await navigator.mediaDevices.getUserMedia({
@@ -220,7 +187,7 @@ window.capturePhoto = () => {
   status.innerText = "📸 Photo captured";
 };
 
-/* ================== GPS ================== */
+/* ================= GPS ================= */
 function getGPS() {
   return new Promise((resolve, reject) => {
     navigator.geolocation.getCurrentPosition(
@@ -235,7 +202,14 @@ function getGPS() {
   });
 }
 
-/* ================== MAP ================== */
+function accuracyLabel(a) {
+  if (a <= 20) return "🟢 Excellent";
+  if (a <= 30) return "🟡 Good";
+  if (a <= 40) return "🟠 Fair";
+  return "🔴 Poor";
+}
+
+/* ================= MAP ================= */
 const map = new Map({ basemap: "satellite" });
 const view = new MapView({
   container: "mapDiv",
@@ -244,7 +218,7 @@ const view = new MapView({
   zoom: 5
 });
 
-/* ================== PREVIEW ================== */
+/* ================= PREVIEW ================= */
 window.previewLocation = async () => {
   if (!photoTaken) {
     alert("Pehle photo lo");
@@ -272,10 +246,10 @@ window.previewLocation = async () => {
   }));
 
   status.innerText =
-    `📍 GPS Accuracy: ${gpsPoint.accuracy} m`;
+    `📍 GPS Accuracy: ${gpsPoint.accuracy} m  ${accuracyLabel(gpsPoint.accuracy)}`;
 };
 
-/* ================== UPLOAD ================== */
+/* ================= UPLOAD (NO LOGIN) ================= */
 window.uploadData = async () => {
 
   if (!photoTaken || !gpsPoint) {
@@ -283,19 +257,12 @@ window.uploadData = async () => {
     return;
   }
 
-  if (gpsPoint.accuracy > 30) {
-    alert("GPS accuracy weak hai, thoda wait karke try karo");
+  if (gpsPoint.accuracy > 40) {
+    alert("GPS accuracy weak hai");
     return;
   }
 
-  status.innerText = "⬆ Uploading to ArcGIS Online...";
-
-  /* LOGIN */
-  await esriId.checkSignInStatus(
-    "https://www.arcgis.com/sharing"
-  ).catch(() =>
-    esriId.getCredential("https://www.arcgis.com/sharing")
-  );
+  status.innerText = "⬆ Uploading data...";
 
   const point = new Point({
     latitude: gpsPoint.latitude,
@@ -322,26 +289,9 @@ window.uploadData = async () => {
 
   if (res.data.addResults[0].success) {
     status.innerText = "✅ Upload successful! Data added to ArcGIS Online";
-    resetBtn.style.display = "block";
   } else {
     status.innerText = "❌ Upload failed";
   }
-};
-
-/* ================== RESET ================== */
-window.reCapture = () => {
-  photoTaken = false;
-  gpsPoint = null;
-  status.innerText = "🔄 Re-capture photo";
-};
-
-window.resetForm = () => {
-  document.querySelectorAll("input").forEach(i => i.value = "");
-  photoTaken = false;
-  gpsPoint = null;
-  view.graphics.removeAll();
-  mapDiv.style.height = "0";
-  status.innerText = "🧹 Ready for new site";
 };
 });
 </script>
