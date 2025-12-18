@@ -12,6 +12,7 @@
 
 <style>
 * { box-sizing: border-box; }
+
 body {
   margin: 0;
   min-height: 100vh;
@@ -24,6 +25,7 @@ body {
   align-items: center;
   justify-content: center;
 }
+
 .box {
   background: #fff;
   width: 100%;
@@ -32,16 +34,19 @@ body {
   border-radius: 14px;
   box-shadow: 0 10px 30px rgba(0,0,0,.3);
 }
+
 h2 {
   text-align: center;
   font-size: 16px;
   color: #003b5c;
 }
+
 .field-group {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 8px;
 }
+
 input {
   width: 100%;
   padding: 9px;
@@ -49,7 +54,9 @@ input {
   border-radius: 6px;
   border: 1px solid #ccc;
 }
+
 .full { grid-column: span 2; }
+
 button {
   width: 100%;
   padding: 10px;
@@ -61,27 +68,39 @@ button {
   background: linear-gradient(135deg, #0079c1, #005e95);
   color: #fff;
 }
+
 .secondary { background: #555; }
-.camera-row { display: flex; gap: 8px; }
+.reset { background: #444; }
+
+.camera-row {
+  display: flex;
+  gap: 8px;
+}
 .camera-row button { width: 50%; }
+
 video {
   width: 100%;
   border-radius: 10px;
   margin-top: 6px;
   display: none;
 }
+
 #mapDiv {
   height: 0;
   margin-top: 6px;
   border-radius: 10px;
   overflow: hidden;
 }
+
 #status {
   margin-top: 6px;
   text-align: center;
   font-size: 13px;
   font-weight: bold;
+  line-height: 1.4;
 }
+
+/* FOOTER */
 .footer {
   margin-top: 14px;
   padding-top: 10px;
@@ -93,6 +112,7 @@ video {
   font-size: 12px;
   font-weight: bold;
   color: #003b5c;
+  letter-spacing: 1px;
 }
 </style>
 </head>
@@ -102,6 +122,7 @@ video {
 
 <h2>KALPATARU PROJECTS<br>SITE SURVEY</h2>
 
+<!-- CAMERA -->
 <div class="camera-row">
   <button id="cameraToggleBtn" class="secondary">📷 Start Camera</button>
   <button onclick="capturePhoto()">📸 Capture Photo</button>
@@ -109,6 +130,7 @@ video {
 
 <video id="video" autoplay playsinline></video>
 
+<!-- FIELD DATA -->
 <div class="field-group">
   <input id="CLUSTER" placeholder="Cluster">
   <input id="SITENAME" placeholder="Site Name">
@@ -147,7 +169,7 @@ require([
 const FEATURE_URL =
 "https://services.arcgis.com/NJ6dRODVurthn1U5/arcgis/rest/services/SITE_LOCATION/FeatureServer/0";
 
-/* CLIENT ID (KEPT – NO LOGIN ENFORCED) */
+/* Client ID present (NO login enforced) */
 esriId.registerOAuthInfos([ new OAuthInfo({
   appId: "eTivrXGOGm2NxME8",
   popup: false
@@ -156,6 +178,7 @@ esriId.registerOAuthInfos([ new OAuthInfo({
 /* ================= STATE ================= */
 let cameraStream = null;
 let photoTaken = false;
+let photoBlob = null;
 let gpsPoint = null;
 
 /* ================= CAMERA ================= */
@@ -182,9 +205,18 @@ window.capturePhoto = () => {
     alert("Pehle camera ON karo");
     return;
   }
-  photoTaken = true;
-  stopCamera();
-  status.innerText = "📸 Photo captured";
+
+  const canvas = document.createElement("canvas");
+  canvas.width = video.videoWidth;
+  canvas.height = video.videoHeight;
+  canvas.getContext("2d").drawImage(video, 0, 0);
+
+  canvas.toBlob(blob => {
+    photoBlob = blob;
+    photoTaken = true;
+    stopCamera();
+    status.innerText = "📸 Photo captured";
+  }, "image/jpeg", 0.9);
 };
 
 /* ================= GPS ================= */
@@ -249,20 +281,20 @@ window.previewLocation = async () => {
     `📍 GPS Accuracy: ${gpsPoint.accuracy} m  ${accuracyLabel(gpsPoint.accuracy)}`;
 };
 
-/* ================= UPLOAD (NO LOGIN) ================= */
+/* ================= UPLOAD DATA + PHOTO ================= */
 window.uploadData = async () => {
 
-  if (!photoTaken || !gpsPoint) {
+  if (!photoTaken || !gpsPoint || !photoBlob) {
     alert("Photo aur GPS dono zaroori hain");
     return;
   }
 
   if (gpsPoint.accuracy > 40) {
-    alert("GPS accuracy weak hai");
+    alert("GPS accuracy weak hai, thoda wait karo");
     return;
   }
 
-  status.innerText = "⬆ Uploading data...";
+  status.innerText = "⬆ Uploading data & photo...";
 
   const point = new Point({
     latitude: gpsPoint.latitude,
@@ -279,7 +311,8 @@ window.uploadData = async () => {
     REMARKS: REMARKS.value
   };
 
-  const res = await esriRequest(FEATURE_URL + "/addFeatures", {
+  /* 1️⃣ Add Feature */
+  const addRes = await esriRequest(FEATURE_URL + "/addFeatures", {
     method: "post",
     query: {
       f: "json",
@@ -287,12 +320,27 @@ window.uploadData = async () => {
     }
   });
 
-  if (res.data.addResults[0].success) {
-    status.innerText = "✅ Upload successful! Data added to ArcGIS Online";
-  } else {
-    status.innerText = "❌ Upload failed";
+  if (!addRes.data.addResults[0].success) {
+    status.innerText = "❌ Data upload failed";
+    return;
   }
+
+  const objectId = addRes.data.addResults[0].objectId;
+
+  /* 2️⃣ Add Attachment */
+  const formData = new FormData();
+  formData.append("attachment", photoBlob, "site_photo.jpg");
+  formData.append("f", "json");
+
+  await fetch(
+    FEATURE_URL + "/" + objectId + "/addAttachment",
+    { method: "POST", body: formData }
+  );
+
+  status.innerText =
+    "✅ Upload successful! Data + photo added to ArcGIS Online";
 };
+
 });
 </script>
 
