@@ -105,6 +105,26 @@ video {
   font-weight: bold;
   line-height: 1.4;
 }
+
+/* FOOTER BRANDING */
+.footer {
+  margin-top: 14px;
+  padding-top: 10px;
+  border-top: 1px solid #ddd;
+  text-align: center;
+}
+
+.footer img {
+  height: 38px;
+  margin-bottom: 4px;
+}
+
+.footer-text {
+  font-size: 12px;
+  font-weight: bold;
+  color: #003b5c;
+  letter-spacing: 1px;
+}
 </style>
 </head>
 
@@ -152,6 +172,13 @@ video {
 
 <div id="mapDiv"></div>
 <div id="status"></div>
+
+<!-- FOOTER -->
+<div class="footer">
+  <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/4/46/Kalpataru_logo.svg/1024px-Kalpataru_logo.svg.png?20210728073518"
+       alt="Kalpataru Logo">
+  <div class="footer-text">KALPATARU WATER TEAM</div>
+</div>
 </div>
 
 <script>
@@ -244,7 +271,7 @@ async function optimizeGPS() {
   drawGPS();
 }
 
-/* DRAW POINT + CIRCLE */
+/* DRAW */
 function drawGPS() {
   mapDiv.style.height = "220px";
   view.graphics.removeAll();
@@ -274,12 +301,10 @@ function drawGPS() {
   view.graphics.add(accuracyCircle);
 
   if (bestGPS.accuracy <= 30) {
-    status.innerText =
-      `📍 GPS Accuracy: ${bestGPS.accuracy} m (Good)`;
+    status.innerText = `📍 GPS Accuracy: ${bestGPS.accuracy} m (Good)`;
     recaptureBtn.style.display = "none";
   } else {
-    status.innerText =
-      `⚠️ GPS Accuracy: ${bestGPS.accuracy} m (Weak – tap circle)`;
+    status.innerText = `⚠️ GPS Accuracy: ${bestGPS.accuracy} m (Weak – tap circle)`;
     recaptureBtn.style.display = "block";
   }
 }
