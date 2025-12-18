@@ -31,16 +31,16 @@ body {
   background: #fff;
   width: 100%;
   max-width: 420px;
-  padding: 18px;
+  padding: 16px;
   border-radius: 14px;
   box-shadow: 0 10px 30px rgba(0,0,0,0.3);
 }
 
 h2 {
   text-align: center;
-  font-size: 17px;
+  font-size: 16px;
   color: #003b5c;
-  margin-bottom: 8px;
+  margin-bottom: 6px;
 }
 
 .field-group {
@@ -61,9 +61,9 @@ input, select {
 
 button {
   width: 100%;
-  padding: 11px;
-  margin-top: 8px;
-  font-size: 15px;
+  padding: 10px;
+  margin-top: 6px;
+  font-size: 14px;
   font-weight: bold;
   border-radius: 8px;
   border: none;
@@ -75,13 +75,12 @@ button.secondary {
   background: #555;
 }
 
-video, canvas {
+video {
   width: 100%;
   border-radius: 10px;
   margin-top: 6px;
+  display: none;
 }
-
-canvas { display: none; }
 
 #mapDiv {
   height: 0;
@@ -99,13 +98,13 @@ canvas { display: none; }
 }
 
 .footer {
-  margin-top: 10px;
+  margin-top: 8px;
   text-align: center;
   border-top: 1px solid #ddd;
   padding-top: 6px;
 }
 
-.footer img { height: 34px; }
+.footer img { height: 32px; }
 .footer-text {
   font-size: 12px;
   font-weight: bold;
@@ -119,12 +118,9 @@ canvas { display: none; }
 <div class="box">
 <h2>KALPATARU PROJECTS<br>SITE SURVEY</h2>
 
-<!-- 🎥 CAMERA ON / OFF -->
+<!-- 📷 CAMERA CONTROL -->
 <button id="cameraToggleBtn" class="secondary">📷 Start Camera</button>
-
-<video id="video" autoplay playsinline style="display:none;"></video>
-<canvas id="canvas"></canvas>
-
+<video id="video" autoplay playsinline></video>
 <button onclick="capturePhoto()">📸 Capture Photo</button>
 
 <div class="field-group">
@@ -135,7 +131,7 @@ canvas { display: none; }
   <input id="SUB_COMPONENTS" placeholder="Sub Components" class="full">
   <input id="REMARKS" placeholder="Remarks" class="full">
 
-  <!-- 🗺️ Basemap options -->
+  <!-- MAP TYPE -->
   <select id="basemapSelect" class="full">
     <option value="streets-navigation-vector">Streets</option>
     <option value="satellite">Satellite</option>
@@ -146,6 +142,7 @@ canvas { display: none; }
 </div>
 
 <button onclick="previewLocation()">🗺️ Preview Location</button>
+<button onclick="recheckGPS()">🔄 Re-check GPS</button>
 <button onclick="uploadData()">⬆ Upload Data</button>
 
 <div id="mapDiv"></div>
@@ -162,9 +159,10 @@ require([
   "esri/Map",
   "esri/views/MapView",
   "esri/geometry/Point",
+  "esri/geometry/Circle",
   "esri/Graphic",
   "esri/request"
-], function (Map, MapView, Point, Graphic, esriRequest) {
+], function (Map, MapView, Point, Circle, Graphic, esriRequest) {
 
 const featureUrl =
 "https://services.arcgis.com/NJ6dRODVurthn1U5/arcgis/rest/services/SITE_LOCATION/FeatureServer/0";
@@ -173,7 +171,7 @@ let cameraStream = null;
 let photoBlob = null;
 let currentGPS = null;
 
-/* 🎥 CAMERA TOGGLE */
+/* CAMERA TOGGLE */
 const video = document.getElementById("video");
 const toggleBtn = document.getElementById("cameraToggleBtn");
 
@@ -190,57 +188,59 @@ toggleBtn.addEventListener("click", async () => {
       alert("❌ Camera access denied");
     }
   } else {
-    cameraStream.getTracks().forEach(t => t.stop());
-    cameraStream = null;
-    video.style.display = "none";
-    toggleBtn.innerText = "📷 Start Camera";
+    stopCamera();
   }
 });
 
-/* 📸 CAPTURE PHOTO (HIDE CAMERA AFTER CAPTURE) */
+function stopCamera() {
+  if (cameraStream) {
+    cameraStream.getTracks().forEach(t => t.stop());
+    cameraStream = null;
+  }
+  video.style.display = "none";
+  toggleBtn.innerText = "📷 Start Camera";
+}
+
+/* CAPTURE PHOTO */
 window.capturePhoto = function () {
   if (!cameraStream) {
     alert("Pehle camera ON karo");
     return;
   }
 
-  const canvas = document.getElementById("canvas");
-  const status = document.getElementById("status");
-
+  const canvas = document.createElement("canvas");
   canvas.width = video.videoWidth;
   canvas.height = video.videoHeight;
   canvas.getContext("2d").drawImage(video, 0, 0);
 
   canvas.toBlob(blob => {
     photoBlob = blob;
-    status.innerText = "📸 Photo captured successfully";
+    document.getElementById("status").innerText = "📸 Photo captured";
   }, "image/jpeg");
 
-  // 🔑 UX FIX: hide camera & photo
-  video.style.display = "none";
-  canvas.style.display = "none";
-
-  // stop camera
-  cameraStream.getTracks().forEach(t => t.stop());
-  cameraStream = null;
-
-  toggleBtn.innerText = "📷 Start Camera";
+  stopCamera();
 };
 
-/* 📍 GPS */
+/* 🔥 HIGH ACCURACY GPS */
 function getLiveGPS() {
   return new Promise((resolve, reject) => {
     navigator.geolocation.getCurrentPosition(
       pos => resolve({
         latitude: pos.coords.latitude,
-        longitude: pos.coords.longitude
+        longitude: pos.coords.longitude,
+        accuracy: Math.round(pos.coords.accuracy)
       }),
-      () => reject()
+      err => reject(err),
+      {
+        enableHighAccuracy: true,
+        timeout: 15000,
+        maximumAge: 0
+      }
     );
   });
 }
 
-/* 🗺️ MAP INIT */
+/* MAP INIT */
 const map = new Map({ basemap: "streets-navigation-vector" });
 const view = new MapView({
   container: "mapDiv",
@@ -249,12 +249,10 @@ const view = new MapView({
   zoom: 5
 });
 
-/* BASEMAP CHANGE */
-document.getElementById("basemapSelect").addEventListener("change", e => {
-  map.basemap = e.target.value;
-});
+document.getElementById("basemapSelect")
+  .addEventListener("change", e => map.basemap = e.target.value);
 
-/* 🗺️ PREVIEW LOCATION */
+/* PREVIEW LOCATION */
 window.previewLocation = async function () {
   if (!photoBlob) {
     alert("Pehle photo capture karo");
@@ -272,23 +270,60 @@ window.previewLocation = async function () {
 
   document.getElementById("mapDiv").style.height = "220px";
 
-  view.center = [currentGPS.longitude, currentGPS.latitude];
-  view.zoom = 18;
+  const center = new Point({
+    latitude: currentGPS.latitude,
+    longitude: currentGPS.longitude
+  });
 
+  view.center = center;
+  view.zoom = 18;
   view.graphics.removeAll();
+
+  /* Point */
   view.graphics.add(new Graphic({
-    geometry: new Point(currentGPS),
-    symbol: { type: "simple-marker", color: "red", size: 12 }
+    geometry: center,
+    symbol: { type: "simple-marker", color: "red", size: 10 }
+  }));
+
+  /* Accuracy Circle */
+  view.graphics.add(new Graphic({
+    geometry: new Circle({
+      center: center,
+      radius: currentGPS.accuracy,
+      radiusUnit: "meters"
+    }),
+    symbol: {
+      type: "simple-fill",
+      color: [255, 0, 0, 0.15],
+      outline: { color: "red", width: 1 }
+    }
   }));
 
   view.resize();
-  document.getElementById("status").innerText = "🗺️ Location preview ready";
+
+  document.getElementById("status").innerText =
+    `📍 Accuracy: ${currentGPS.accuracy} meters`;
 };
 
-/* ⬆ UPLOAD */
+/* 🔄 RE-CHECK GPS */
+window.recheckGPS = function () {
+  currentGPS = null;
+  previewLocation();
+};
+
+/* ⛔ UPLOAD WITH ACCURACY CHECK */
 window.uploadData = async function () {
   if (!photoBlob || !currentGPS) {
     alert("Photo + Location required");
+    return;
+  }
+
+  if (currentGPS.accuracy > 30) {
+    alert(
+      "❌ GPS accuracy weak hai (" +
+      currentGPS.accuracy +
+      "m). Open area me jaakar Re-check GPS karo."
+    );
     return;
   }
 
