@@ -70,6 +70,7 @@ button {
 }
 
 .secondary { background: #555; }
+.success { background: #16a34a !important; }
 .reset { background: #444; }
 
 .camera-row {
@@ -112,7 +113,6 @@ video {
   font-size: 12px;
   font-weight: bold;
   color: #003b5c;
-  letter-spacing: 1px;
 }
 </style>
 </head>
@@ -141,7 +141,9 @@ video {
 </div>
 
 <button onclick="previewLocation()">🗺️ Preview Location</button>
-<button onclick="uploadData()">⬆ Upload Data</button>
+<button id="uploadBtn" onclick="uploadData()">⬆ Upload Data</button>
+<button id="newSiteBtn" class="reset" style="display:none"
+ onclick="resetForm()">🧹 New Site</button>
 
 <div id="mapDiv"></div>
 <div id="status"></div>
@@ -157,31 +159,20 @@ video {
 require([
   "esri/Map","esri/views/MapView",
   "esri/geometry/Point","esri/Graphic",
-  "esri/request",
-  "esri/identity/OAuthInfo",
-  "esri/identity/IdentityManager"
-], function (
-  Map, MapView, Point, Graphic,
-  esriRequest, OAuthInfo, esriId
-) {
+  "esri/request"
+], function (Map, MapView, Point, Graphic, esriRequest) {
 
-/* ================= CONFIG ================= */
+/* CONFIG */
 const FEATURE_URL =
 "https://services.arcgis.com/NJ6dRODVurthn1U5/arcgis/rest/services/SITE_LOCATION/FeatureServer/0";
 
-/* Client ID present (NO login enforced) */
-esriId.registerOAuthInfos([ new OAuthInfo({
-  appId: "eTivrXGOGm2NxME8",
-  popup: false
-})]);
-
-/* ================= STATE ================= */
+/* STATE */
 let cameraStream = null;
 let photoTaken = false;
 let photoBlob = null;
 let gpsPoint = null;
 
-/* ================= CAMERA ================= */
+/* CAMERA */
 cameraToggleBtn.onclick = async () => {
   if (!cameraStream) {
     cameraStream = await navigator.mediaDevices.getUserMedia({
@@ -219,7 +210,7 @@ window.capturePhoto = () => {
   }, "image/jpeg", 0.9);
 };
 
-/* ================= GPS ================= */
+/* GPS */
 function getGPS() {
   return new Promise((resolve, reject) => {
     navigator.geolocation.getCurrentPosition(
@@ -241,7 +232,7 @@ function accuracyLabel(a) {
   return "🔴 Poor";
 }
 
-/* ================= MAP ================= */
+/* MAP */
 const map = new Map({ basemap: "satellite" });
 const view = new MapView({
   container: "mapDiv",
@@ -250,7 +241,7 @@ const view = new MapView({
   zoom: 5
 });
 
-/* ================= PREVIEW ================= */
+/* PREVIEW */
 window.previewLocation = async () => {
   if (!photoTaken) {
     alert("Pehle photo lo");
@@ -281,7 +272,7 @@ window.previewLocation = async () => {
     `📍 GPS Accuracy: ${gpsPoint.accuracy} m  ${accuracyLabel(gpsPoint.accuracy)}`;
 };
 
-/* ================= UPLOAD DATA + PHOTO ================= */
+/* UPLOAD */
 window.uploadData = async () => {
 
   if (!photoTaken || !gpsPoint || !photoBlob) {
@@ -290,11 +281,12 @@ window.uploadData = async () => {
   }
 
   if (gpsPoint.accuracy > 40) {
-    alert("GPS accuracy weak hai, thoda wait karo");
+    alert("GPS accuracy weak hai");
     return;
   }
 
   status.innerText = "⬆ Uploading data & photo...";
+  uploadBtn.disabled = true;
 
   const point = new Point({
     latitude: gpsPoint.latitude,
@@ -311,7 +303,6 @@ window.uploadData = async () => {
     REMARKS: REMARKS.value
   };
 
-  /* 1️⃣ Add Feature */
   const addRes = await esriRequest(FEATURE_URL + "/addFeatures", {
     method: "post",
     query: {
@@ -322,25 +313,45 @@ window.uploadData = async () => {
 
   if (!addRes.data.addResults[0].success) {
     status.innerText = "❌ Data upload failed";
+    uploadBtn.disabled = false;
     return;
   }
 
-  const objectId = addRes.data.addResults[0].objectId;
+  const oid = addRes.data.addResults[0].objectId;
 
-  /* 2️⃣ Add Attachment */
-  const formData = new FormData();
-  formData.append("attachment", photoBlob, "site_photo.jpg");
-  formData.append("f", "json");
+  const fd = new FormData();
+  fd.append("attachment", photoBlob, "site_photo.jpg");
+  fd.append("f", "json");
 
-  await fetch(
-    FEATURE_URL + "/" + objectId + "/addAttachment",
-    { method: "POST", body: formData }
-  );
+  await fetch(FEATURE_URL + "/" + oid + "/addAttachment", {
+    method: "POST",
+    body: fd
+  });
 
-  status.innerText =
-    "✅ Upload successful! Data + photo added to ArcGIS Online";
+  /* SUCCESS UI */
+  uploadBtn.classList.add("success");
+  uploadBtn.innerText = "✔ Uploaded";
+  status.innerText = "✅ Upload successful! Data + Photo saved";
+  newSiteBtn.style.display = "block";
 };
 
+/* RESET */
+window.resetForm = () => {
+  document.querySelectorAll("input").forEach(i => i.value = "");
+  photoTaken = false;
+  photoBlob = null;
+  gpsPoint = null;
+
+  view.graphics.removeAll();
+  mapDiv.style.height = "0";
+
+  uploadBtn.classList.remove("success");
+  uploadBtn.innerText = "⬆ Upload Data";
+  uploadBtn.disabled = false;
+
+  newSiteBtn.style.display = "none";
+  status.innerText = "🧹 Ready for new site";
+};
 });
 </script>
 
