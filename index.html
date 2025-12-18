@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
 
 <title>SITE_LOCATION – Camera Survey</title>
 
@@ -10,10 +10,12 @@
 <script src="https://js.arcgis.com/4.29/"></script>
 
 <style>
+* { box-sizing: border-box; }
+
 body {
   font-family: Arial, sans-serif;
-  min-height: 100vh;
   margin: 0;
+  min-height: 100vh;
   background:
     linear-gradient(rgba(0,0,0,0.55), rgba(0,0,0,0.55)),
     url('https://images.unsplash.com/photo-1500530855697-b586d89ba3ee');
@@ -25,28 +27,33 @@ body {
 }
 
 .box {
-  background: rgba(255,255,255,0.95);
-  padding: 25px;
-  max-width: 520px;
+  background: #ffffff;
   width: 100%;
-  border-radius: 10px;
-  box-shadow: 0 8px 25px rgba(0,0,0,0.25);
+  max-width: 420px;
+  padding: 18px;
+  border-radius: 14px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.3);
 }
 
 h2 {
   text-align: center;
+  font-size: 17px;
   color: #003b5c;
+  margin-bottom: 12px;
+  line-height: 1.4;
 }
 
 .field-group {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 10px;
+  gap: 8px;
 }
 
-input {
-  padding: 10px;
-  border-radius: 5px;
+input, select {
+  width: 100%;
+  padding: 9px;
+  font-size: 14px;
+  border-radius: 6px;
   border: 1px solid #ccc;
 }
 
@@ -54,28 +61,46 @@ input {
 
 button {
   width: 100%;
-  padding: 12px;
-  margin-top: 12px;
+  padding: 11px;
+  margin-top: 10px;
+  font-size: 15px;
+  font-weight: bold;
+  border-radius: 8px;
+  border: none;
   background: linear-gradient(135deg, #0079c1, #005e95);
   color: #fff;
-  border: none;
-  border-radius: 6px;
-  font-weight: bold;
 }
 
-/* 🔑 KEY CHANGE */
 #mapDiv {
   height: 0;
+  margin-top: 10px;
+  border-radius: 10px;
   overflow: hidden;
   transition: height 0.3s ease;
-  margin-top: 10px;
-  border-radius: 8px;
 }
 
 #status {
-  margin-top: 10px;
+  margin-top: 8px;
   text-align: center;
+  font-size: 13px;
   font-weight: bold;
+}
+
+.footer {
+  margin-top: 14px;
+  text-align: center;
+  border-top: 1px solid #ddd;
+  padding-top: 10px;
+}
+
+.footer img {
+  height: 38px;
+}
+
+.footer-text {
+  font-size: 12px;
+  font-weight: bold;
+  color: #003b5c;
 }
 </style>
 </head>
@@ -88,13 +113,24 @@ button {
 <div class="field-group">
   <input id="CLUSTER" placeholder="Cluster">
   <input id="SITENAME" placeholder="Site Name">
+
   <input type="date" id="DATE">
   <input id="COMPONENTS" placeholder="Components">
+
   <input id="SUB_COMPONENTS" placeholder="Sub Components" class="full">
   <input id="REMARKS" placeholder="Remarks" class="full">
 
-  <!-- CAMERA ONLY -->
+  <!-- 📷 CAMERA ONLY -->
   <input type="file" id="photo" accept="image/*" capture="environment" class="full">
+
+  <!-- 🗺️ BASEMAP CHOOSER -->
+  <select id="basemapSelect" class="full">
+    <option value="streets-navigation-vector">Streets</option>
+    <option value="satellite">Satellite</option>
+    <option value="hybrid">Hybrid</option>
+    <option value="topo-vector">Terrain</option>
+    <option value="osm">OpenStreetMap</option>
+  </select>
 </div>
 
 <button onclick="previewLocation()">🗺️ Preview Location</button>
@@ -102,6 +138,11 @@ button {
 
 <div id="mapDiv"></div>
 <div id="status"></div>
+
+<div class="footer">
+  <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/4/46/Kalpataru_logo.svg/1024px-Kalpataru_logo.svg.png">
+  <div class="footer-text">KALPATARU WATER TEAM</div>
+</div>
 </div>
 
 <script>
@@ -118,21 +159,24 @@ const featureUrl =
 
 let currentGPS = null;
 
-/* ✅ MAP CREATED ON PAGE LOAD (KEY FIX) */
 const map = new Map({ basemap: "streets-navigation-vector" });
 
-const mapView = new MapView({
+const view = new MapView({
   container: "mapDiv",
   map: map,
   center: [77, 28],
   zoom: 5
 });
 
+document.getElementById("basemapSelect").addEventListener("change", e => {
+  map.basemap = e.target.value;
+});
+
 function getLiveGPS() {
-  return new Promise((res, rej) => {
+  return new Promise((resolve, reject) => {
     navigator.geolocation.getCurrentPosition(
-      p => res({ latitude: p.coords.latitude, longitude: p.coords.longitude }),
-      () => rej()
+      pos => resolve({ latitude: pos.coords.latitude, longitude: pos.coords.longitude }),
+      () => reject()
     );
   });
 }
@@ -150,25 +194,24 @@ window.previewLocation = async function () {
     return;
   }
 
-  /* SHOW MAP */
-  mapDiv.style.height = "250px";
+  mapDiv.style.height = "230px";
 
-  mapView.center = [currentGPS.longitude, currentGPS.latitude];
-  mapView.zoom = 18;
+  view.center = [currentGPS.longitude, currentGPS.latitude];
+  view.zoom = 18;
 
-  mapView.graphics.removeAll();
-  mapView.graphics.add(new Graphic({
+  view.graphics.removeAll();
+  view.graphics.add(new Graphic({
     geometry: new Point(currentGPS),
     symbol: { type: "simple-marker", color: "red", size: 12 }
   }));
 
-  mapView.resize();
+  view.resize();
   status.innerText = "🗺️ Location preview ready";
 };
 
 window.uploadData = async function () {
   if (!currentGPS) {
-    alert("Pehle preview karo");
+    alert("Pehle Preview Location karo");
     return;
   }
 
