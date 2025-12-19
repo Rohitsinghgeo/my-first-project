@@ -4,7 +4,6 @@
   "start_url": "/my-first-project/index.html",
   "scope": "/my-first-project/",
   "display": "standalone",
-  "display_override": ["standalone", "fullscreen"],
   "background_color": "#ffffff",
   "theme_color": "#005e95",
   "orientation": "portrait",
