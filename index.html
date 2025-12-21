@@ -131,9 +131,10 @@ video {
 <div class="field-group">
   <input id="CLUSTER" placeholder="CLUSTER">
   <input id="SITE_NAME" placeholder="SITE_NAME">
-  <input type="date" id="DATE">
+  <input type="DATE" id="DATE">
   <input id="COMPONENTS" placeholder="COMPONENTS">
-  <input id="SUB_COMPONENTS" class="full" placeholder="SUB_COMPONENTS">
+  <input id="SUBCOMPONENTS" class="full" placeholder="SUBCOMPONENTS">
+  <input id="PROJECT" class="full" placeholder="PROJECT">
   <input id="REMARKS" class="full" placeholder="Remarks">
 </div>
 
@@ -310,9 +311,10 @@ window.uploadData = async () => {
   const attributes = {
     CLUSTER: CLUSTER.value,
     SITE_NAME: SITE_NAME.value,
-    DATE_: DATE.value,
+    DATE: DATE.value,
     COMPONENTS: COMPONENTS.value,
-    SUB_COMPONENTS: SUB_COMPONENTS.value,
+    SUBCOMPONENTS: SUBCOMPONENTS.value,
+    PROJECT: PROJECT.value,
     REMARKS: REMARKS.value
   };
 
