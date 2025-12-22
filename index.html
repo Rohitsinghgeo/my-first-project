@@ -11,67 +11,107 @@
 <script src="https://js.arcgis.com/4.29/"></script>
 
 <style>
-*{box-sizing:border-box}
-body{
-  margin:0;
-  min-height:100vh;
-  font-family:Arial,sans-serif;
-  background:#222;
-  display:flex;
-  align-items:center;
-  justify-content:center;
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  font-family: Arial, sans-serif;
+  background:
+    linear-gradient(rgba(0,0,0,.55), rgba(0,0,0,.55)),
+    url('https://images.unsplash.com/photo-1500530855697-b586d89ba3ee');
+  background-size: cover;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
-.box{
-  background:#fff;
-  width:100%;
-  max-width:420px;
-  padding:16px;
-  border-radius:14px;
+
+.box {
+  background: #fff;
+  width: 100%;
+  max-width: 420px;
+  padding: 16px;
+  border-radius: 14px;
+  box-shadow: 0 10px 30px rgba(0,0,0,.3);
 }
-h2{text-align:center;font-size:16px;color:#003b5c}
-.field-group{
-  display:grid;
-  grid-template-columns:1fr 1fr;
-  gap:8px;
+
+h2 {
+  text-align: center;
+  font-size: 16px;
+  color: #003b5c;
 }
-input{
-  width:100%;
-  padding:8px;
-  font-size:13px;
+
+.field-group {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
 }
-.full{grid-column:span 2}
-button{
-  width:100%;
-  padding:10px;
-  margin-top:6px;
-  font-weight:bold;
+
+input {
+  width: 100%;
+  padding: 9px;
+  font-size: 14px;
+  border-radius: 6px;
+  border: 1px solid #ccc;
 }
-.secondary{background:#555;color:#fff}
-video{
-  width:100%;
-  border-radius:10px;
-  display:none;
-  margin-top:6px;
+
+.full { grid-column: span 2; }
+
+button {
+  width: 100%;
+  padding: 10px;
+  margin-top: 6px;
+  font-size: 14px;
+  font-weight: bold;
+  border-radius: 8px;
+  border: none;
+  background: linear-gradient(135deg, #0079c1, #005e95);
+  color: #fff;
 }
-#mapDiv{
-  height:0;
-  margin-top:6px;
-  border-radius:10px;
-  overflow:hidden;
+
+.secondary { background: #555; }
+.success { background: #16a34a !important; }
+.reset { background: #444; }
+
+.camera-row {
+  display: flex;
+  gap: 8px;
 }
-#offlineList{
-  display:none;
-  font-size:12px;
-  border:1px solid #ccc;
-  margin-top:6px;
-  padding:6px;
-  max-height:150px;
-  overflow:auto;
+.camera-row button { width: 50%; }
+
+video {
+  width: 100%;
+  border-radius: 10px;
+  margin-top: 6px;
+  display: none;
 }
-#status{
-  margin-top:6px;
-  font-size:13px;
-  font-weight:bold;
+
+#mapDiv {
+  height: 0;
+  margin-top: 6px;
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+#status {
+  margin-top: 6px;
+  text-align: center;
+  font-size: 13px;
+  font-weight: bold;
+  line-height: 1.4;
+}
+
+.footer {
+  margin-top: 14px;
+  padding-top: 10px;
+  border-top: 1px solid #ddd;
+  text-align: center;
+}
+.footer img { height: 38px; }
+.footer-text {
+  font-size: 12px;
+  font-weight: bold;
+  color: #003b5c;
 }
 </style>
 </head>
@@ -81,29 +121,35 @@ video{
 
 <h2>KALPATARU PROJECTS<br>SITE SURVEY</h2>
 
+<div class="camera-row">
+  <button id="cameraToggleBtn" class="secondary">📷 Start Camera</button>
+  <button onclick="capturePhoto()">📸 Capture Photo</button>
+</div>
+
+<video id="video" autoplay playsinline></video>
+
 <div class="field-group">
   <input id="CLUSTER" placeholder="CLUSTER">
   <input id="SITE_NAME" placeholder="SITE_NAME">
-  <input type="date" id="DATE">
+  <input type="DATE" id="DATE">
   <input id="COMPONENTS" placeholder="COMPONENTS">
   <input id="SUBCOMPONENTS" class="full" placeholder="SUBCOMPONENTS">
   <input id="PROJECT" class="full" placeholder="PROJECT">
-  <input id="REMARKS" class="full" placeholder="REMARKS">
+  <input id="REMARKS" class="full" placeholder="Remarks">
 </div>
 
-<button id="cameraToggleBtn" class="secondary">📷 Start Camera</button>
-<button onclick="capturePhoto()">📸 Capture Photo</button>
-<video id="video" autoplay playsinline></video>
-
 <button onclick="previewLocation()">🗺️ Preview Location</button>
-<button onclick="uploadData()">⬆ Upload / Save</button>
-<button onclick="syncOfflineData()" class="secondary">🔄 Sync Offline</button>
-<button onclick="toggleOfflineList()" class="secondary">📂 View Offline Records</button>
+<button id="uploadBtn" onclick="uploadData()">⬆ Upload Data</button>
+<button id="newSiteBtn" class="reset" style="display:none"
+ onclick="resetForm()">🧹 New Site</button>
 
-<div id="offlineCount">Offline Records: 0</div>
 <div id="mapDiv"></div>
-<div id="offlineList"></div>
 <div id="status"></div>
+
+<div class="footer">
+  <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/4/46/Kalpataru_logo.svg/1024px-Kalpataru_logo.svg.png">
+  <div class="footer-text">KALPATARU WATER TEAM</div>
+</div>
 
 </div>
 
@@ -114,175 +160,216 @@ require([
   "esri/request"
 ], function (Map, MapView, Point, Graphic, esriRequest) {
 
+/* ================= CONFIG ================= */
 const FEATURE_URL =
 "https://services.arcgis.com/NJ6dRODVurthn1U5/arcgis/rest/services/SITE_LOCATION/FeatureServer/0";
 
-let cameraStream=null;
-let photoBase64=null;
-let gpsPoint=null;
+/* ================= STATE ================= */
+let cameraStream = null;
+let photoTaken = false;
+let photoBlob = null;
+let gpsPoint = null;
 
-/* ================= CAMERA (BACK CAMERA) ================= */
-cameraToggleBtn.onclick = async ()=>{
-  if(!cameraStream){
-    try{
-      cameraStream = await navigator.mediaDevices.getUserMedia({
-        video:{facingMode:{exact:"environment"}}
-      });
-    }catch(e){
-      cameraStream = await navigator.mediaDevices.getUserMedia({
-        video:{facingMode:"environment"}
-      });
-    }
-    video.srcObject=cameraStream;
-    video.style.display="block";
-    cameraToggleBtn.innerText="⏹ Stop Camera";
-  }else{
-    stopCamera();
-  }
+/* ================= CAMERA ================= */
+cameraToggleBtn.onclick = async () => {
+  if (!cameraStream) {
+    cameraStream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: "environment" }
+    });
+    video.srcObject = cameraStream;
+    video.style.display = "block";
+    cameraToggleBtn.innerText = "⏹ Stop Camera";
+  } else stopCamera();
 };
 
-function stopCamera(){
-  cameraStream.getTracks().forEach(t=>t.stop());
-  cameraStream=null;
-  video.style.display="none";
-  cameraToggleBtn.innerText="📷 Start Camera";
+function stopCamera() {
+  cameraStream?.getTracks().forEach(t => t.stop());
+  cameraStream = null;
+  video.style.display = "none";
+  cameraToggleBtn.innerText = "📷 Start Camera";
 }
 
-window.capturePhoto=()=>{
-  if(!cameraStream){alert("Pehle camera ON karo");return;}
-  const c=document.createElement("canvas");
-  c.width=video.videoWidth;
-  c.height=video.videoHeight;
-  c.getContext("2d").drawImage(video,0,0);
-  photoBase64=c.toDataURL("image/jpeg",0.7);
-  stopCamera();
-  status.innerText="📸 Photo captured";
-};
-
-/* ================= MAP (ONLINE / OFFLINE) ================= */
-const map=new Map({
-  basemap: navigator.onLine ? "satellite" : null
-});
-
-const view=new MapView({
-  container:"mapDiv",
-  map:map,
-  zoom:5,
-  background:{color:"#e5e7eb"}
-});
-
-/* ================= GPS PREVIEW ================= */
-window.previewLocation=()=>{
-  navigator.geolocation.getCurrentPosition(p=>{
-    gpsPoint={
-      latitude:p.coords.latitude,
-      longitude:p.coords.longitude,
-      accuracy:Math.round(p.coords.accuracy)
-    };
-
-    mapDiv.style.height="220px";
-    const pt=new Point(gpsPoint);
-    view.center=pt;
-    view.zoom=18;
-    view.graphics.removeAll();
-    view.graphics.add(new Graphic({
-      geometry:pt,
-      symbol:{type:"simple-marker",color:"red",size:10}
-    }));
-    status.innerText="📍 GPS Accuracy "+gpsPoint.accuracy+" m";
-  },()=>alert("GPS error"));
-};
-
-/* ================= OFFLINE STORAGE ================= */
-function getOffline(){
-  return JSON.parse(localStorage.getItem("offlineSites")||"[]");
-}
-function setOffline(d){
-  localStorage.setItem("offlineSites",JSON.stringify(d));
-  offlineCount.innerText="Offline Records: "+d.length;
-}
-
-/* ================= UPLOAD / SAVE ================= */
-window.uploadData=async()=>{
-
-  if(!photoBase64){alert("Pehle photo lo");return;}
-  if(!gpsPoint){alert("Pehle Preview Location karo");return;}
-
-  const record={
-    attributes:{
-      CLUSTER:CLUSTER.value,
-      SITE_NAME:SITE_NAME.value,
-      DATE:DATE.value,
-      COMPONENTS:COMPONENTS.value,
-      SUBCOMPONENTS:SUBCOMPONENTS.value,
-      PROJECT:PROJECT.value,
-      REMARKS:REMARKS.value
-    },
-    gpsPoint:gpsPoint,
-    photoBase64:photoBase64,
-    time:new Date().toLocaleString()
-  };
-
-  if(!navigator.onLine){
-    const d=getOffline();
-    d.push(record);
-    setOffline(d);
-    status.innerText="📴 Saved Offline Successfully";
+window.capturePhoto = () => {
+  if (!cameraStream) {
+    alert("Pehle camera ON karo");
     return;
   }
 
-  await uploadSingle(record);
-  status.innerText="✅ Uploaded Successfully";
+  const canvas = document.createElement("canvas");
+  canvas.width = video.videoWidth;
+  canvas.height = video.videoHeight;
+  canvas.getContext("2d").drawImage(video, 0, 0);
+
+  canvas.toBlob(blob => {
+    photoBlob = blob;
+    photoTaken = true;
+    stopCamera();
+    status.innerText = "📸 Photo captured";
+  }, "image/jpeg", 0.7); // ✅ optimized
 };
 
-/* ================= OFFLINE LIST ================= */
-window.toggleOfflineList=()=>{
-  offlineList.innerHTML="";
-  getOffline().forEach((r,i)=>{
-    offlineList.innerHTML+=`
-      <div>
-        <b>${i+1}. ${r.attributes.SITE_NAME || "No Name"}</b><br>
-        ${r.time}<br>
-        Lat:${r.gpsPoint.latitude.toFixed(5)},
-        Lon:${r.gpsPoint.longitude.toFixed(5)}
-        <hr>
-      </div>`;
-  });
-  offlineList.style.display=
-    offlineList.style.display==="block"?"none":"block";
-};
+/* ================= GPS (BEST ACCURACY) ================= */
+async function getBestGPS() {
+  let best = null;
 
-/* ================= SYNC ================= */
-window.syncOfflineData=async()=>{
-  if(!navigator.onLine){alert("No Internet");return;}
-  for(const r of getOffline()) await uploadSingle(r);
-  setOffline([]);
-  offlineList.style.display="none";
-  status.innerText="✅ Offline data synced";
-};
+  for (let i = 0; i < 5; i++) {
+    const pos = await new Promise((resolve, reject) => {
+      navigator.geolocation.getCurrentPosition(
+        resolve,
+        reject,
+        { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 }
+      );
+    });
 
-async function uploadSingle(r){
-  const pt=new Point(r.gpsPoint);
-  const add=await esriRequest(FEATURE_URL+"/addFeatures",{
-    method:"post",
-    query:{
-      f:"json",
-      features:JSON.stringify([{geometry:pt,attributes:r.attributes}])
+    const current = {
+      latitude: pos.coords.latitude,
+      longitude: pos.coords.longitude,
+      accuracy: Math.round(pos.coords.accuracy)
+    };
+
+    if (!best || current.accuracy < best.accuracy) {
+      best = current;
     }
-  });
-  const oid=add.data.addResults[0].objectId;
-  const blob=await fetch(r.photoBase64).then(r=>r.blob());
-  const fd=new FormData();
-  fd.append("attachment",blob,"photo.jpg");
-  fd.append("f","json");
-  await fetch(FEATURE_URL+"/"+oid+"/addAttachment",{method:"POST",body:fd});
+
+    if (best.accuracy <= 20) break;
+    await new Promise(r => setTimeout(r, 2000));
+  }
+
+  return best;
 }
 
-/* INIT */
-setOffline(getOffline());
-window.addEventListener("online",syncOfflineData);
+function accuracyLabel(a) {
+  if (a <= 20) return "🟢 Excellent";
+  if (a <= 30) return "🟡 Good";
+  if (a <= 40) return "🟠 Fair";
+  return "🔴 Poor";
+}
+
+/* ================= MAP ================= */
+const map = new Map({ basemap: "satellite" });
+const view = new MapView({
+  container: "mapDiv",
+  map,
+  center: [77, 28],
+  zoom: 5
+});
+
+/* ================= PREVIEW ================= */
+window.previewLocation = async () => {
+  if (!photoTaken) {
+    alert("Pehle photo lo");
+    return;
+  }
+
+  status.innerText = "📡 Getting best GPS...";
+  gpsPoint = await getBestGPS();
+
+  mapDiv.style.height = "220px";
+  view.graphics.removeAll();
+
+  const pt = new Point({
+    latitude: gpsPoint.latitude,
+    longitude: gpsPoint.longitude,
+    spatialReference: { wkid: 4326 }
+  });
+
+  view.center = pt;
+  view.zoom = 18;
+
+  view.graphics.add(new Graphic({
+    geometry: pt,
+    symbol: { type: "simple-marker", color: "red", size: 10 }
+  }));
+
+  status.innerText =
+    `📍 GPS Accuracy: ${gpsPoint.accuracy} m ${accuracyLabel(gpsPoint.accuracy)}`;
+};
+
+/* ================= UPLOAD ================= */
+window.uploadData = async () => {
+
+  if (!photoTaken || !gpsPoint || !photoBlob) {
+    alert("Photo aur GPS dono zaroori hain");
+    return;
+  }
+
+  if (gpsPoint.accuracy > 40) {
+    alert("GPS accuracy weak hai");
+    return;
+  }
+
+  uploadBtn.disabled = true;
+  uploadBtn.innerText = "Uploading...";
+  status.innerText = "⬆ Uploading data & photo...";
+
+  const point = new Point({
+    latitude: gpsPoint.latitude,
+    longitude: gpsPoint.longitude,
+    spatialReference: { wkid: 4326 }
+  });
+
+  const attributes = {
+    CLUSTER: CLUSTER.value,
+    SITE_NAME: SITE_NAME.value,
+    DATE: DATE.value,
+    COMPONENTS: COMPONENTS.value,
+    SUBCOMPONENTS: SUBCOMPONENTS.value,
+    PROJECT: PROJECT.value,
+    REMARKS: REMARKS.value
+  };
+
+  const addRes = await esriRequest(FEATURE_URL + "/addFeatures", {
+    method: "post",
+    query: {
+      f: "json",
+      features: JSON.stringify([{ geometry: point, attributes }])
+    }
+  });
+
+  if (!addRes.data.addResults[0].success) {
+    status.innerText = "❌ Data upload failed";
+    uploadBtn.disabled = false;
+    uploadBtn.innerText = "⬆ Upload Data";
+    return;
+  }
+
+  const oid = addRes.data.addResults[0].objectId;
+
+  const fd = new FormData();
+  fd.append("attachment", photoBlob, "site_photo.jpg");
+  fd.append("f", "json");
+
+  await fetch(FEATURE_URL + "/" + oid + "/addAttachment", {
+    method: "POST",
+    body: fd
+  });
+
+  uploadBtn.classList.add("success");
+  uploadBtn.innerText = "✔ Uploaded";
+  status.innerText = "✅ Upload successful! Data + Photo saved";
+  newSiteBtn.style.display = "block";
+};
+
+/* ================= RESET ================= */
+window.resetForm = () => {
+  document.querySelectorAll("input").forEach(i => i.value = "");
+  photoTaken = false;
+  photoBlob = null;
+  gpsPoint = null;
+
+  view.graphics.removeAll();
+  mapDiv.style.height = "0";
+
+  uploadBtn.classList.remove("success");
+  uploadBtn.innerText = "⬆ Upload Data";
+  uploadBtn.disabled = false;
+
+  newSiteBtn.style.display = "none";
+  status.innerText = "🧹 Ready for new site";
+};
 
 });
 </script>
+
 </body>
 </html>
