@@ -11,65 +11,67 @@
 <script src="https://js.arcgis.com/4.29/"></script>
 
 <style>
-* { box-sizing: border-box; }
-body {
-  margin: 0;
-  min-height: 100vh;
-  font-family: Arial, sans-serif;
+*{box-sizing:border-box}
+body{
+  margin:0;
+  min-height:100vh;
+  font-family:Arial,sans-serif;
   background:#222;
   display:flex;
   align-items:center;
   justify-content:center;
 }
-.box {
+.box{
   background:#fff;
   width:100%;
   max-width:420px;
   padding:16px;
   border-radius:14px;
 }
-h2 { text-align:center;font-size:16px;color:#003b5c; }
-
-.field-group {
+h2{text-align:center;font-size:16px;color:#003b5c}
+.field-group{
   display:grid;
   grid-template-columns:1fr 1fr;
   gap:8px;
 }
-input {
+input{
   width:100%;
   padding:8px;
   font-size:13px;
 }
-.full { grid-column:span 2; }
-
-button {
+.full{grid-column:span 2}
+button{
   width:100%;
   padding:10px;
   margin-top:6px;
   font-weight:bold;
 }
-.secondary { background:#555;color:#fff }
-
-video {
+.secondary{background:#555;color:#fff}
+video{
   width:100%;
   border-radius:10px;
   display:none;
   margin-top:6px;
 }
-
-#mapDiv {
+#mapDiv{
   height:0;
   margin-top:6px;
   border-radius:10px;
   overflow:hidden;
 }
-
-#offlineList {
+#offlineList{
   display:none;
   font-size:12px;
   border:1px solid #ccc;
   margin-top:6px;
   padding:6px;
+  max-height:150px;
+  overflow:auto;
+}
+#status{
+  margin-top:6px;
+  font-size:13px;
+  font-weight:bold;
 }
 </style>
 </head>
@@ -119,25 +121,22 @@ let cameraStream=null;
 let photoBase64=null;
 let gpsPoint=null;
 
-/* ================= CAMERA (BACK CAMERA FIXED) ================= */
-cameraToggleBtn.onclick = async () => {
-  if (!cameraStream) {
-    try {
-      // Try strict back camera
+/* ================= CAMERA (BACK CAMERA) ================= */
+cameraToggleBtn.onclick = async ()=>{
+  if(!cameraStream){
+    try{
       cameraStream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: { exact: "environment" } }
+        video:{facingMode:{exact:"environment"}}
       });
-    } catch (e) {
-      // Fallback for devices that don't support exact
+    }catch(e){
       cameraStream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: "environment" }
+        video:{facingMode:"environment"}
       });
     }
-
-    video.srcObject = cameraStream;
-    video.style.display = "block";
-    cameraToggleBtn.innerText = "⏹ Stop Camera";
-  } else {
+    video.srcObject=cameraStream;
+    video.style.display="block";
+    cameraToggleBtn.innerText="⏹ Stop Camera";
+  }else{
     stopCamera();
   }
 };
@@ -149,8 +148,8 @@ function stopCamera(){
   cameraToggleBtn.innerText="📷 Start Camera";
 }
 
-window.capturePhoto = () => {
-  if(!cameraStream) return alert("Camera ON karo");
+window.capturePhoto=()=>{
+  if(!cameraStream){alert("Pehle camera ON karo");return;}
   const c=document.createElement("canvas");
   c.width=video.videoWidth;
   c.height=video.videoHeight;
@@ -160,15 +159,20 @@ window.capturePhoto = () => {
   status.innerText="📸 Photo captured";
 };
 
-/* ================= MAP + GPS ================= */
-const map=new Map({ basemap:"satellite" });
-const view=new MapView({
-  container:"mapDiv",
-  map,
-  zoom:5
+/* ================= MAP (ONLINE / OFFLINE) ================= */
+const map=new Map({
+  basemap: navigator.onLine ? "satellite" : null
 });
 
-window.previewLocation = () => {
+const view=new MapView({
+  container:"mapDiv",
+  map:map,
+  zoom:5,
+  background:{color:"#e5e7eb"}
+});
+
+/* ================= GPS PREVIEW ================= */
+window.previewLocation=()=>{
   navigator.geolocation.getCurrentPosition(p=>{
     gpsPoint={
       latitude:p.coords.latitude,
@@ -185,12 +189,11 @@ window.previewLocation = () => {
       geometry:pt,
       symbol:{type:"simple-marker",color:"red",size:10}
     }));
-
     status.innerText="📍 GPS Accuracy "+gpsPoint.accuracy+" m";
-  });
+  },()=>alert("GPS error"));
 };
 
-/* ================= OFFLINE HELPERS ================= */
+/* ================= OFFLINE STORAGE ================= */
 function getOffline(){
   return JSON.parse(localStorage.getItem("offlineSites")||"[]");
 }
@@ -200,7 +203,10 @@ function setOffline(d){
 }
 
 /* ================= UPLOAD / SAVE ================= */
-window.uploadData = async () => {
+window.uploadData=async()=>{
+
+  if(!photoBase64){alert("Pehle photo lo");return;}
+  if(!gpsPoint){alert("Pehle Preview Location karo");return;}
 
   const record={
     attributes:{
@@ -212,14 +218,16 @@ window.uploadData = async () => {
       PROJECT:PROJECT.value,
       REMARKS:REMARKS.value
     },
-    gpsPoint,
-    photoBase64,
+    gpsPoint:gpsPoint,
+    photoBase64:photoBase64,
     time:new Date().toLocaleString()
   };
 
   if(!navigator.onLine){
-    const d=getOffline(); d.push(record); setOffline(d);
-    status.innerText="📴 Saved Offline";
+    const d=getOffline();
+    d.push(record);
+    setOffline(d);
+    status.innerText="📴 Saved Offline Successfully";
     return;
   }
 
@@ -228,11 +236,10 @@ window.uploadData = async () => {
 };
 
 /* ================= OFFLINE LIST ================= */
-window.toggleOfflineList = () => {
-  const box=offlineList;
-  box.innerHTML="";
+window.toggleOfflineList=()=>{
+  offlineList.innerHTML="";
   getOffline().forEach((r,i)=>{
-    box.innerHTML+=`
+    offlineList.innerHTML+=`
       <div>
         <b>${i+1}. ${r.attributes.SITE_NAME || "No Name"}</b><br>
         ${r.time}<br>
@@ -241,12 +248,13 @@ window.toggleOfflineList = () => {
         <hr>
       </div>`;
   });
-  box.style.display = box.style.display==="block" ? "none" : "block";
+  offlineList.style.display=
+    offlineList.style.display==="block"?"none":"block";
 };
 
 /* ================= SYNC ================= */
-window.syncOfflineData = async () => {
-  if(!navigator.onLine) return alert("No Internet");
+window.syncOfflineData=async()=>{
+  if(!navigator.onLine){alert("No Internet");return;}
   for(const r of getOffline()) await uploadSingle(r);
   setOffline([]);
   offlineList.style.display="none";
@@ -259,7 +267,7 @@ async function uploadSingle(r){
     method:"post",
     query:{
       f:"json",
-      features:JSON.stringify([{ geometry:pt, attributes:r.attributes }])
+      features:JSON.stringify([{geometry:pt,attributes:r.attributes}])
     }
   });
   const oid=add.data.addResults[0].objectId;
