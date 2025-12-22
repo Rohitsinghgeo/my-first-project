@@ -60,6 +60,7 @@ video{
   margin-top:6px;
 }
 #status{margin-top:6px;font-size:14px;font-weight:bold;text-align:center;}
+#offlineCount{margin-top:4px;font-size:13px;font-weight:bold;}
 </style>
 </head>
 
@@ -108,10 +109,9 @@ const FEATURE_URL =
 let cameraStream = null;
 let photoBase64 = null;
 let gpsPoint = null;
-
-/* ===== CAMERA ===== */
 const uploadBtn = document.getElementById("uploadBtn");
 
+/* ===== CAMERA ===== */
 cameraToggleBtn.onclick = async () => {
   if (!cameraStream) {
     try {
@@ -157,22 +157,32 @@ const view=new MapView({
 });
 
 window.previewLocation=()=>{
-  navigator.geolocation.getCurrentPosition(p=>{
-    gpsPoint={
-      latitude:p.coords.latitude,
-      longitude:p.coords.longitude,
-      accuracy:Math.round(p.coords.accuracy)
-    };
-    mapDiv.style.height="220px";
-    const pt=new Point(gpsPoint);
-    view.center=pt; view.zoom=18;
-    view.graphics.removeAll();
-    view.graphics.add(new Graphic({
-      geometry:pt,
-      symbol:{type:"simple-marker",color:"red",size:10}
-    }));
-    status.innerText="📍 GPS Accuracy "+gpsPoint.accuracy+" m";
-  },()=>alert("GPS not available"));
+  navigator.geolocation.getCurrentPosition(
+    p=>{
+      gpsPoint={
+        latitude:p.coords.latitude,
+        longitude:p.coords.longitude,
+        accuracy:Math.round(p.coords.accuracy)
+      };
+      mapDiv.style.height="220px";
+      const pt=new Point(gpsPoint);
+      view.center=pt; view.zoom=18;
+      view.graphics.removeAll();
+      view.graphics.add(new Graphic({
+        geometry:pt,
+        symbol:{type:"simple-marker",color:"red",size:10}
+      }));
+      status.innerText="📍 GPS Accuracy "+gpsPoint.accuracy+" m";
+    },
+    ()=>{
+      if(!navigator.onLine){
+        alert("⚠️ Pehli baar GPS ke liye ek baar ONLINE run karo. Offline me GPS tab work karega.");
+      } else {
+        alert("❌ GPS permission denied / unavailable");
+      }
+    },
+    { enableHighAccuracy: true, timeout:15000 }
+  );
 };
 
 /* ===== OFFLINE STORAGE ===== */
@@ -198,7 +208,8 @@ window.uploadData=async()=>{
       PROJECT:PROJECT.value,
       REMARKS:REMARKS.value
     },
-    gpsPoint,photoBase64,
+    gpsPoint: gpsPoint || null,
+    photoBase64,
     time:new Date().toLocaleString()
   };
 
@@ -207,7 +218,7 @@ window.uploadData=async()=>{
 
   if(!navigator.onLine){
     const d=getOffline(); d.push(record); setOffline(d);
-    status.innerText="📴 No net - saved offline";
+    status.innerText="📴 Offline save successful";
     uploadBtn.disabled=false;
     uploadBtn.innerText="⬆ Upload / Save";
     return;
@@ -217,22 +228,22 @@ window.uploadData=async()=>{
 
   uploadBtn.disabled=false;
   uploadBtn.innerText="⬆ Upload / Save";
-
-  status.innerText = success ?
-    "✅ Data uploaded successfully" :
-    "❌ Upload failed (saved offline)";
+  status.innerText = success ? "✅ Data & Photo Uploaded Successfully" : "❌ Upload failed (saved offline)";
 };
 
 /* ===== OFFLINE LIST VIEW ===== */
 window.toggleOfflineList=()=>{
+  const data = getOffline();
+  if(data.length===0){ alert("📂 Koi offline record nahi hai"); return; }
   offlineList.innerHTML="";
-  getOffline().forEach((r,i)=>{ 
+  data.forEach((r,i)=>{
     offlineList.innerHTML +=
       `<div>
         <b>${i+1}. ${r.attributes.SITE_NAME || "No Name"}</b><br>
         ${r.time}<br>
-        Lat:${r.gpsPoint.latitude.toFixed(5)},
-        Lon:${r.gpsPoint.longitude.toFixed(5)}<hr>
+        Lat:${r.gpsPoint?.latitude?.toFixed(5) || "-"},
+        Lon:${r.gpsPoint?.longitude?.toFixed(5) || "-"}
+        <hr>
       </div>`;
   });
   offlineList.style.display= offlineList.style.display==="block"?"none":"block";
@@ -240,43 +251,38 @@ window.toggleOfflineList=()=>{
 
 /* ===== SYNC OFFLINE ===== */
 window.syncOfflineData=async()=>{
-  if(!navigator.onLine){alert("No internet");return;}
-  const list = getOffline();
+  if(!navigator.onLine){alert("No Internet"); return;}
+  const list=getOffline();
   for(const r of list) await uploadSingle(r);
   setOffline([]);
   offlineList.style.display="none";
   status.innerText="✅ Offline data synced";
 };
 
-/* ===== UPLOAD WITH ATTACHMENT ===== */
+/* ===== UPLOAD SINGLE WITH ATTACHMENT ===== */
 async function uploadSingle(r){
   try{
     status.innerText="⬆ Uploading data...";
     const pt=new Point(r.gpsPoint);
-
-    const add = await esriRequest(FEATURE_URL + "/addFeatures",{
+    const add=await esriRequest(FEATURE_URL+"/addFeatures",{
       method:"post",
       query:{
         f:"json",
         features: JSON.stringify([{geometry:pt,attributes:r.attributes}])
       }
     });
-
     const res=add.data.addResults[0];
     if(!res.success) throw "AddFeatures failed";
 
     const oid = res.objectId;
-
     status.innerText="📸 Uploading photo...";
     const blob=await fetch(r.photoBase64).then(x=>x.blob());
     const fd=new FormData();
     fd.append("attachment",blob,"photo.jpg");
     fd.append("f","json");
 
-    const attUrl = FEATURE_URL + "/" + oid + "/addAttachment";
-    const attResp = await fetch(attUrl,{method:"POST",body:fd});
+    const attResp = await fetch(FEATURE_URL+"/"+oid+"/addAttachment",{method:"POST",body:fd});
     if(!attResp.ok) throw "Attachment failed";
-
     return true;
   }catch(e){
     console.error(e);
@@ -286,7 +292,6 @@ async function uploadSingle(r){
 
 window.addEventListener("online",syncOfflineData);
 
-});
 </script>
 </body>
 </html>
