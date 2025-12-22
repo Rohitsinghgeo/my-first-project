@@ -105,41 +105,39 @@ require([
   "esri/request"
 ], function (Map, MapView, Point, Graphic, esriRequest) {
 
-const FEATURE_URL = 
-"https://services.arcgis.com/NJ6dRODVurthn1U5/arcgis/rest/services/SITE_LOCATION/FeatureServer/0";
+const FEATURE_URL = "https://services.arcgis.com/NJ6dRODVurthn1U5/arcgis/rest/services/SITE_LOCATION/FeatureServer/0";
 
 /* ===== STATE ===== */
 let cameraStream = null;
 let photoBase64 = null;
 let gpsPoint = null;
 const uploadBtn = document.getElementById("uploadBtn");
-
-/* ===== CAMERA (Back Camera) ===== */
 const video = document.getElementById("video");
 const cameraToggleBtn = document.getElementById("cameraToggleBtn");
 
+/* ===== CAMERA ===== */
 cameraToggleBtn.onclick = async () => {
-  if (!cameraStream) {
-    try {
-      cameraStream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: { exact: "environment" } }
-      });
-    } catch (e) {
-      cameraStream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: "environment" }
-      });
+  if(!cameraStream){
+    let constraints = { video: { facingMode: "environment" } };
+    try { cameraStream = await navigator.mediaDevices.getUserMedia(constraints); }
+    catch(e1){
+      console.warn("Back camera failed, trying any camera", e1);
+      try { cameraStream = await navigator.mediaDevices.getUserMedia({ video:true }); }
+      catch(e2){ alert("Camera access failed: " + e2.message); return; }
     }
     video.srcObject = cameraStream;
-    video.style.display = "block";
-    cameraToggleBtn.innerText = "⏹ Stop Camera";
+    video.style.display="block";
+    cameraToggleBtn.innerText="⏹ Stop Camera";
   } else stopCamera();
 };
 
-function stopCamera() {
-  cameraStream.getTracks().forEach(t => t.stop());
-  cameraStream = null;
-  video.style.display = "none";
-  cameraToggleBtn.innerText = "📷 Start Camera";
+function stopCamera(){
+  if(cameraStream){
+    cameraStream.getTracks().forEach(t=>t.stop());
+    cameraStream=null;
+    video.style.display="none";
+    cameraToggleBtn.innerText="📷 Start Camera";
+  }
 }
 
 window.capturePhoto = () => {
@@ -160,24 +158,18 @@ const view = new MapView({ container:"mapDiv", map:map, zoom:5, background:{colo
 window.previewLocation = () => {
   navigator.geolocation.getCurrentPosition(
     p => {
-      gpsPoint = {
-        latitude: p.coords.latitude,
-        longitude: p.coords.longitude,
-        accuracy: Math.round(p.coords.accuracy)
-      };
+      gpsPoint = { latitude:p.coords.latitude, longitude:p.coords.longitude, accuracy:Math.round(p.coords.accuracy) };
       mapDiv.style.height = "220px";
       const pt = new Point(gpsPoint);
       view.center = pt; view.zoom=18;
       view.graphics.removeAll();
-      view.graphics.add(new Graphic({geometry:pt,symbol:{type:"simple-marker",color:"red",size:10}}));
+      view.graphics.add(new Graphic({geometry:pt, symbol:{type:"simple-marker",color:"red",size:10}}));
       status.innerText = "📍 GPS Accuracy "+gpsPoint.accuracy+" m";
     },
     () => {
       if(!navigator.onLine){
         alert("⚠️ Pehli baar GPS ke liye ek baar ONLINE run karo. Offline me GPS tab work karega.");
-      } else {
-        alert("❌ GPS permission denied / unavailable");
-      }
+      } else { alert("❌ GPS permission denied / unavailable"); }
     },
     { enableHighAccuracy:true, timeout:15000 }
   );
@@ -212,19 +204,14 @@ window.uploadData = async () => {
   uploadBtn.innerText = "Uploading...";
 
   if(!navigator.onLine){
-    const d = getOffline();
-    d.push(record);
-    setOffline(d);
+    const d = getOffline(); d.push(record); setOffline(d);
     status.innerText = "📴 Offline save successful";
-    uploadBtn.disabled = false;
-    uploadBtn.innerText = "⬆ Upload / Save";
+    uploadBtn.disabled=false; uploadBtn.innerText="⬆ Upload / Save";
     return;
   }
 
   const success = await uploadSingle(record);
-
-  uploadBtn.disabled = false;
-  uploadBtn.innerText = "⬆ Upload / Save";
+  uploadBtn.disabled=false; uploadBtn.innerText="⬆ Upload / Save";
   status.innerText = success ? "✅ Data & Photo Uploaded Successfully" : "❌ Upload failed (saved offline)";
 };
 
@@ -248,8 +235,7 @@ window.syncOfflineData = async () => {
   if(!navigator.onLine){ alert("No Internet"); return; }
   const list = getOffline();
   for(const r of list) await uploadSingle(r);
-  setOffline([]);
-  offlineList.style.display="none";
+  setOffline([]); offlineList.style.display="none";
   status.innerText = "✅ Offline data synced";
 };
 
@@ -274,10 +260,7 @@ async function uploadSingle(r){
     const attResp = await fetch(FEATURE_URL+"/"+oid+"/addAttachment",{method:"POST",body:fd});
     if(!attResp.ok) throw "Attachment failed";
     return true;
-  } catch(e){
-    console.error(e);
-    return false;
-  }
+  } catch(e){ console.error(e); return false; }
 }
 
 window.addEventListener("online", syncOfflineData);
@@ -285,3 +268,4 @@ window.addEventListener("online", syncOfflineData);
 </script>
 </body>
 </html>
+
