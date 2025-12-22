@@ -45,8 +45,12 @@ button{
   padding:10px;
   margin-top:6px;
   font-weight:bold;
+  border:none;
+  border-radius:6px;
 }
 .secondary{background:#555;color:#fff}
+.success{background:green;color:#fff}
+.fail{background:red;color:#fff}
 video{
   width:100%;
   border-radius:10px;
@@ -69,12 +73,6 @@ video{
   overflow:auto;
 }
 #status{
-  margin-top:6px;
-  font-size:13px;
-  font-weight:bold;
-  text-align:center;
-}
-#offlineCount{
   margin-top:6px;
   font-size:13px;
   font-weight:bold;
@@ -102,7 +100,7 @@ video{
 <video id="video" autoplay playsinline></video>
 
 <button onclick="previewLocation()">🗺️ Preview Location</button>
-<button onclick="uploadData()">⬆ Upload / Save</button>
+<button id="uploadBtn" onclick="uploadData()">⬆ Upload / Save</button>
 <button onclick="syncOfflineData()" class="secondary">🔄 Sync Offline</button>
 <button onclick="toggleOfflineList()" class="secondary">📂 View Offline Records</button>
 
@@ -120,6 +118,7 @@ require([
   "esri/request"
 ], function (Map, MapView, Point, Graphic, esriRequest) {
 
+/* ================= CONFIG ================= */
 const FEATURE_URL =
 "https://services.arcgis.com/NJ6dRODVurthn1U5/arcgis/rest/services/SITE_LOCATION/FeatureServer/0";
 
@@ -128,37 +127,37 @@ let cameraStream=null;
 let photoBase64=null;
 let gpsPoint=null;
 
-/* ================= CAMERA (ORIGINAL WORKING LOGIC) ================= */
-cameraToggleBtn.onclick = async () => {
-  if (!cameraStream) {
-    try {
+/* ================= CAMERA (BACK CAMERA) ================= */
+cameraToggleBtn.onclick = async ()=>{
+  if(!cameraStream){
+    try{
       cameraStream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: "environment" }
+        video:{facingMode:{exact:"environment"}}
       });
-    } catch (e) {
+    }catch{
       cameraStream = await navigator.mediaDevices.getUserMedia({
-        video: true
+        video:{facingMode:"environment"}
       });
     }
-    video.srcObject = cameraStream;
-    video.style.display = "block";
-    cameraToggleBtn.innerText = "⏹ Stop Camera";
-  } else {
+    video.srcObject=cameraStream;
+    video.style.display="block";
+    cameraToggleBtn.innerText="⏹ Stop Camera";
+  }else{
     stopCamera();
   }
 };
 
 function stopCamera(){
-  if(cameraStream){
-    cameraStream.getTracks().forEach(t=>t.stop());
-    cameraStream=null;
-  }
+  cameraStream.getTracks().forEach(t=>t.stop());
+  cameraStream=null;
   video.style.display="none";
   cameraToggleBtn.innerText="📷 Start Camera";
 }
 
 window.capturePhoto=()=>{
-  if(!cameraStream){alert("Pehle camera ON karo");return;}
+  if(!cameraStream){
+    alert("Pehle camera ON karo");return;
+  }
   const c=document.createElement("canvas");
   c.width=video.videoWidth;
   c.height=video.videoHeight;
@@ -179,7 +178,7 @@ const view=new MapView({
   background:{color:"#e5e7eb"}
 });
 
-/* ================= GPS PREVIEW (OFFLINE OK) ================= */
+/* ================= GPS PREVIEW ================= */
 window.previewLocation=()=>{
   navigator.geolocation.getCurrentPosition(p=>{
     gpsPoint={
@@ -197,7 +196,7 @@ window.previewLocation=()=>{
       symbol:{type:"simple-marker",color:"red",size:10}
     }));
     status.innerText="📍 GPS Accuracy "+gpsPoint.accuracy+" m";
-  },()=>alert("GPS not available"),{enableHighAccuracy:true});
+  },()=>alert("GPS not found"),{enableHighAccuracy:true});
 };
 
 /* ================= OFFLINE STORAGE ================= */
@@ -212,6 +211,9 @@ setOffline(getOffline());
 
 /* ================= UPLOAD / SAVE ================= */
 window.uploadData=async()=>{
+  uploadBtn.className="";
+  uploadBtn.innerText="⬆ Upload / Save";
+
   if(!photoBase64){alert("Photo zaroori hai");return;}
   if(!gpsPoint){alert("Preview Location zaroori hai");return;}
 
@@ -234,18 +236,31 @@ window.uploadData=async()=>{
     const d=getOffline();
     d.push(record);
     setOffline(d);
-    status.innerText="📴 Offline save successful";
+    uploadBtn.className="success";
+    uploadBtn.innerText="✔ Saved Offline";
+    status.innerText="📴 Offline data saved successfully";
     return;
   }
 
   const ok=await uploadSingle(record);
-  status.innerText= ok ? "✅ Uploaded successfully" : "❌ Upload failed";
+  if(ok){
+    uploadBtn.className="success";
+    uploadBtn.innerText="✔ Uploaded";
+    status.innerText="✅ Data uploaded successfully";
+  }else{
+    uploadBtn.className="fail";
+    uploadBtn.innerText="❌ Failed";
+    status.innerText="❌ Upload failed";
+  }
 };
 
 /* ================= OFFLINE LIST ================= */
 window.toggleOfflineList=()=>{
   const d=getOffline();
-  if(d.length===0){alert("No offline records");return;}
+  if(d.length===0){
+    alert("No offline records");
+    return;
+  }
   offlineList.innerHTML="";
   d.forEach((r,i)=>{
     offlineList.innerHTML+=`
@@ -263,13 +278,20 @@ window.toggleOfflineList=()=>{
 
 /* ================= SYNC ================= */
 window.syncOfflineData=async()=>{
-  if(!navigator.onLine){alert("No Internet");return;}
-  for(const r of getOffline()) await uploadSingle(r);
+  if(!navigator.onLine){
+    alert("Internet required");
+    return;
+  }
+  const d=getOffline();
+  for(const r of d){
+    await uploadSingle(r);
+  }
   setOffline([]);
   offlineList.style.display="none";
   status.innerText="✅ Offline data synced";
 };
 
+/* ================= UPLOAD SINGLE ================= */
 async function uploadSingle(r){
   try{
     const pt=new Point(r.gpsPoint);
