@@ -127,12 +127,18 @@ let cameraStream=null;
 let photoBase64=null;
 let gpsPoint=null;
 
-/* CAMERA – BACK */
+/* ================= CAMERA ================= */
 cameraToggleBtn.onclick = async ()=>{
   if(!cameraStream){
-    cameraStream = await navigator.mediaDevices.getUserMedia({
-      video:{facingMode:"environment"}
-    });
+    try{
+      cameraStream = await navigator.mediaDevices.getUserMedia({
+        video:{facingMode:{exact:"environment"}}
+      });
+    }catch(e){
+      cameraStream = await navigator.mediaDevices.getUserMedia({
+        video:{facingMode:"environment"}
+      });
+    }
     video.srcObject=cameraStream;
     video.style.display="block";
     cameraToggleBtn.innerText="⏹ Stop Camera";
@@ -157,15 +163,15 @@ window.capturePhoto=()=>{
   status.innerText="📸 Photo captured";
 };
 
-/* MAP */
-const map=new Map({basemap:"satellite"});
+/* ================= MAP ================= */
+const map=new Map({ basemap: navigator.onLine ? "satellite" : null });
 const view=new MapView({
   container:"mapDiv",
   map:map,
   zoom:5
 });
 
-/* GPS */
+/* ================= GPS ================= */
 window.previewLocation=()=>{
   navigator.geolocation.getCurrentPosition(p=>{
     gpsPoint={
@@ -186,7 +192,7 @@ window.previewLocation=()=>{
   },()=>alert("GPS error"));
 };
 
-/* OFFLINE STORAGE */
+/* ================= OFFLINE STORAGE ================= */
 function getOffline(){
   return JSON.parse(localStorage.getItem("offlineSites")||"[]");
 }
@@ -195,13 +201,11 @@ function setOffline(d){
   offlineCount.innerText="Offline Records: "+d.length;
 }
 
-/* UPLOAD / SAVE */
+/* ================= UPLOAD / SAVE ================= */
 window.uploadData=async()=>{
 
-  if(!photoBase64 || !gpsPoint){
-    alert("Photo aur GPS zaroori hai");
-    return;
-  }
+  if(!photoBase64){alert("Pehle photo lo");return;}
+  if(!gpsPoint){alert("Pehle Preview Location karo");return;}
 
   uploadBtn.disabled=true;
   uploadBtn.innerText="Processing...";
@@ -228,7 +232,7 @@ window.uploadData=async()=>{
 
     uploadBtn.classList.add("success");
     uploadBtn.innerText="✔ Saved Offline";
-    status.innerText="📴 Offline save successful";
+    status.innerText="📴 Saved Offline Successfully";
     newSiteBtn.style.display="block";
     return;
   }
@@ -237,11 +241,11 @@ window.uploadData=async()=>{
 
   uploadBtn.classList.add("success");
   uploadBtn.innerText="✔ Uploaded";
-  status.innerText="✅ Upload successful";
+  status.innerText="✅ Uploaded Successfully";
   newSiteBtn.style.display="block";
 };
 
-/* RESET FOR NEW SITE */
+/* ================= NEW SITE RESET ================= */
 window.resetForm=()=>{
   document.querySelectorAll("input").forEach(i=>i.value="");
   photoBase64=null;
@@ -257,26 +261,32 @@ window.resetForm=()=>{
   status.innerText="Ready for new site";
 };
 
-/* VIEW OFFLINE */
+/* ================= VIEW OFFLINE ================= */
 window.toggleOfflineList=()=>{
-  const d=getOffline();
+  const data=getOffline();
   offlineList.innerHTML="";
-  if(d.length===0){alert("No offline records");return;}
-  d.forEach((r,i)=>{
-    offlineList.innerHTML+=`
-      <div>
-        <b>${i+1}. ${r.attributes.SITE_NAME||"No Name"}</b><br>
-        ${r.time}<br>
-        Lat:${r.gpsPoint.latitude.toFixed(5)},
-        Lon:${r.gpsPoint.longitude.toFixed(5)}
-        <hr>
-      </div>`;
+  if(data.length===0){
+    alert("No offline records found");
+    offlineList.style.display="none";
+    return;
+  }
+  data.forEach((r,i)=>{
+    const div=document.createElement("div");
+    div.style.borderBottom="1px solid #ccc";
+    div.style.padding="6px 0";
+    div.innerHTML=`
+      <b>${i+1}. ${r.attributes.SITE_NAME||"No Name"}</b><br>
+      ${r.time}<br>
+      Lat:${r.gpsPoint.latitude.toFixed(5)},
+      Lon:${r.gpsPoint.longitude.toFixed(5)}
+    `;
+    offlineList.appendChild(div);
   });
   offlineList.style.display =
     offlineList.style.display==="block"?"none":"block";
 };
 
-/* SYNC */
+/* ================= SYNC ================= */
 window.syncOfflineData=async()=>{
   if(!navigator.onLine){alert("No Internet");return;}
   for(const r of getOffline()) await uploadSingle(r);
@@ -304,6 +314,7 @@ async function uploadSingle(r){
 
 /* INIT */
 setOffline(getOffline());
+window.addEventListener("online",syncOfflineData);
 
 });
 </script>
