@@ -47,9 +47,6 @@ button{
   font-weight:bold;
 }
 .secondary{background:#555;color:#fff}
-.success{background:#16a34a;color:#fff}
-.reset{background:#444;color:#fff}
-
 video{
   width:100%;
   border-radius:10px;
@@ -99,10 +96,7 @@ video{
 <video id="video" autoplay playsinline></video>
 
 <button onclick="previewLocation()">🗺️ Preview Location</button>
-
-<button id="uploadBtn" onclick="uploadData()">⬆ Upload / Save</button>
-<button id="newSiteBtn" class="reset" style="display:none" onclick="resetForm()">🧹 New Site</button>
-
+<button onclick="uploadData()">⬆ Upload / Save</button>
 <button onclick="syncOfflineData()" class="secondary">🔄 Sync Offline</button>
 <button onclick="toggleOfflineList()" class="secondary">📂 View Offline Records</button>
 
@@ -142,7 +136,9 @@ cameraToggleBtn.onclick = async ()=>{
     video.srcObject=cameraStream;
     video.style.display="block";
     cameraToggleBtn.innerText="⏹ Stop Camera";
-  }else stopCamera();
+  }else{
+    stopCamera();
+  }
 };
 
 function stopCamera(){
@@ -164,7 +160,10 @@ window.capturePhoto=()=>{
 };
 
 /* ================= MAP ================= */
-const map=new Map({ basemap: navigator.onLine ? "satellite" : null });
+const map=new Map({
+  basemap: navigator.onLine ? "satellite" : null
+});
+
 const view=new MapView({
   container:"mapDiv",
   map:map,
@@ -179,6 +178,7 @@ window.previewLocation=()=>{
       longitude:p.coords.longitude,
       accuracy:Math.round(p.coords.accuracy)
     };
+
     mapDiv.style.height="220px";
     const pt=new Point(gpsPoint);
     view.center=pt;
@@ -203,12 +203,8 @@ function setOffline(d){
 
 /* ================= UPLOAD / SAVE ================= */
 window.uploadData=async()=>{
-
   if(!photoBase64){alert("Pehle photo lo");return;}
   if(!gpsPoint){alert("Pehle Preview Location karo");return;}
-
-  uploadBtn.disabled=true;
-  uploadBtn.innerText="Processing...";
 
   const record={
     attributes:{
@@ -229,47 +225,26 @@ window.uploadData=async()=>{
     const d=getOffline();
     d.push(record);
     setOffline(d);
-
-    uploadBtn.classList.add("success");
-    uploadBtn.innerText="✔ Saved Offline";
     status.innerText="📴 Saved Offline Successfully";
-    newSiteBtn.style.display="block";
     return;
   }
 
   await uploadSingle(record);
-
-  uploadBtn.classList.add("success");
-  uploadBtn.innerText="✔ Uploaded";
   status.innerText="✅ Uploaded Successfully";
-  newSiteBtn.style.display="block";
 };
 
-/* ================= NEW SITE RESET ================= */
-window.resetForm=()=>{
-  document.querySelectorAll("input").forEach(i=>i.value="");
-  photoBase64=null;
-  gpsPoint=null;
-  view.graphics.removeAll();
-  mapDiv.style.height="0";
-
-  uploadBtn.classList.remove("success");
-  uploadBtn.innerText="⬆ Upload / Save";
-  uploadBtn.disabled=false;
-
-  newSiteBtn.style.display="none";
-  status.innerText="Ready for new site";
-};
-
-/* ================= VIEW OFFLINE ================= */
+/* ================= VIEW OFFLINE RECORDS (FIXED) ================= */
 window.toggleOfflineList=()=>{
+
   const data=getOffline();
   offlineList.innerHTML="";
+
   if(data.length===0){
     alert("No offline records found");
     offlineList.style.display="none";
     return;
   }
+
   data.forEach((r,i)=>{
     const div=document.createElement("div");
     div.style.borderBottom="1px solid #ccc";
@@ -282,6 +257,7 @@ window.toggleOfflineList=()=>{
     `;
     offlineList.appendChild(div);
   });
+
   offlineList.style.display =
     offlineList.style.display==="block"?"none":"block";
 };
