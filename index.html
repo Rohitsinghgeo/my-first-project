@@ -2,140 +2,297 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Offline Site Survey</title>
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport"
+ content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+
+<title>SITE_LOCATION – GIS Field Survey</title>
+
+<link rel="stylesheet" href="https://js.arcgis.com/4.29/esri/themes/light/main.css">
+<script src="https://js.arcgis.com/4.29/"></script>
 
 <style>
-body {
-    font-family: Arial, sans-serif;
-    background: #f5f5f5;
-    margin: 0;
-    padding: 10px;
+*{box-sizing:border-box}
+body{
+  margin:0;
+  min-height:100vh;
+  font-family:Arial,sans-serif;
+  background:#222;
+  display:flex;
+  align-items:center;
+  justify-content:center;
 }
-button {
-    padding: 10px;
-    margin: 5px 0;
-    width: 100%;
-    font-size: 16px;
+.box{
+  background:#fff;
+  width:100%;
+  max-width:420px;
+  padding:16px;
+  border-radius:14px;
 }
-#offlineCount {
-    font-weight: bold;
-    color: green;
+h2{text-align:center;font-size:16px;color:#003b5c}
+.field-group{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:8px;
 }
-#offlineList {
-    display: none;
-    background: #fff;
-    padding: 10px;
-    border-radius: 5px;
+input{
+  width:100%;
+  padding:8px;
+  font-size:13px;
 }
-.record {
-    border-bottom: 1px solid #ccc;
-    padding: 5px 0;
+.full{grid-column:span 2}
+button{
+  width:100%;
+  padding:10px;
+  margin-top:6px;
+  font-weight:bold;
+}
+.secondary{background:#555;color:#fff}
+video{
+  width:100%;
+  border-radius:10px;
+  display:none;
+  margin-top:6px;
+}
+#mapDiv{
+  height:0;
+  margin-top:6px;
+  border-radius:10px;
+  overflow:hidden;
+}
+#offlineList{
+  display:none;
+  font-size:12px;
+  border:1px solid #ccc;
+  margin-top:6px;
+  padding:6px;
+  max-height:150px;
+  overflow:auto;
+}
+#status{
+  margin-top:6px;
+  font-size:13px;
+  font-weight:bold;
 }
 </style>
 </head>
 
 <body>
+<div class="box">
 
-<h3>Site Data</h3>
+<h2>KALPATARU PROJECTS<br>SITE SURVEY</h2>
 
-<input id="siteName" placeholder="Site Name" style="width:100%;padding:8px"><br><br>
+<div class="field-group">
+  <input id="CLUSTER" placeholder="CLUSTER">
+  <input id="SITE_NAME" placeholder="SITE_NAME">
+  <input type="date" id="DATE">
+  <input id="COMPONENTS" placeholder="COMPONENTS">
+  <input id="SUBCOMPONENTS" class="full" placeholder="SUBCOMPONENTS">
+  <input id="PROJECT" class="full" placeholder="PROJECT">
+  <input id="REMARKS" class="full" placeholder="REMARKS">
+</div>
 
-<button onclick="saveOffline()">Save Offline</button>
+<button id="cameraToggleBtn" class="secondary">📷 Start Camera</button>
+<button onclick="capturePhoto()">📸 Capture Photo</button>
+<video id="video" autoplay playsinline></video>
 
-<p>Offline Records: <span id="offlineCount">0</span></p>
+<button onclick="previewLocation()">🗺️ Preview Location</button>
+<button onclick="uploadData()">⬆ Upload / Save</button>
+<button onclick="syncOfflineData()" class="secondary">🔄 Sync Offline</button>
+<button onclick="toggleOfflineList()" class="secondary">📂 View Offline Records</button>
 
-<button id="viewBtn" onclick="toggleOfflineList()" disabled>
-View Offline Records
-</button>
-
+<div id="offlineCount">Offline Records: 0</div>
+<div id="mapDiv"></div>
 <div id="offlineList"></div>
+<div id="status"></div>
+
+</div>
 
 <script>
-/* ------------------ IndexedDB SETUP ------------------ */
-let db;
-const request = indexedDB.open("SiteDB", 1);
+require([
+  "esri/Map","esri/views/MapView",
+  "esri/geometry/Point","esri/Graphic",
+  "esri/request"
+], function (Map, MapView, Point, Graphic, esriRequest) {
 
-request.onupgradeneeded = function (e) {
-    db = e.target.result;
-    db.createObjectStore("sites", { keyPath: "id", autoIncrement: true });
-};
+const FEATURE_URL =
+"https://services.arcgis.com/NJ6dRODVurthn1U5/arcgis/rest/services/SITE_LOCATION/FeatureServer/0";
 
-request.onsuccess = function (e) {
-    db = e.target.result;
-    updateOfflineCount();
-};
+let cameraStream=null;
+let photoBase64=null;
+let gpsPoint=null;
 
-request.onerror = function () {
-    alert("IndexedDB not supported");
-};
-
-/* ------------------ SAVE OFFLINE ------------------ */
-function saveOffline() {
-    const name = document.getElementById("siteName").value;
-    if (!name) {
-        alert("Enter Site Name");
-        return;
+/* ================= CAMERA ================= */
+cameraToggleBtn.onclick = async ()=>{
+  if(!cameraStream){
+    try{
+      cameraStream = await navigator.mediaDevices.getUserMedia({
+        video:{facingMode:{exact:"environment"}}
+      });
+    }catch(e){
+      cameraStream = await navigator.mediaDevices.getUserMedia({
+        video:{facingMode:"environment"}
+      });
     }
+    video.srcObject=cameraStream;
+    video.style.display="block";
+    cameraToggleBtn.innerText="⏹ Stop Camera";
+  }else{
+    stopCamera();
+  }
+};
 
-    const tx = db.transaction("sites", "readwrite");
-    const store = tx.objectStore("sites");
-
-    store.add({
-        siteName: name,
-        time: new Date().toLocaleString()
-    });
-
-    tx.oncomplete = function () {
-        document.getElementById("siteName").value = "";
-        updateOfflineCount();
-        alert("Saved Offline Successfully");
-    };
+function stopCamera(){
+  cameraStream.getTracks().forEach(t=>t.stop());
+  cameraStream=null;
+  video.style.display="none";
+  cameraToggleBtn.innerText="📷 Start Camera";
 }
 
-/* ------------------ COUNT ------------------ */
-function updateOfflineCount() {
-    const tx = db.transaction("sites", "readonly");
-    const store = tx.objectStore("sites");
-    const countReq = store.count();
+window.capturePhoto=()=>{
+  if(!cameraStream){alert("Pehle camera ON karo");return;}
+  const c=document.createElement("canvas");
+  c.width=video.videoWidth;
+  c.height=video.videoHeight;
+  c.getContext("2d").drawImage(video,0,0);
+  photoBase64=c.toDataURL("image/jpeg",0.7);
+  stopCamera();
+  status.innerText="📸 Photo captured";
+};
 
-    countReq.onsuccess = function () {
-        const count = countReq.result;
-        document.getElementById("offlineCount").innerText = count;
+/* ================= MAP ================= */
+const map=new Map({
+  basemap: navigator.onLine ? "satellite" : null
+});
 
-        document.getElementById("viewBtn").disabled = count === 0;
+const view=new MapView({
+  container:"mapDiv",
+  map:map,
+  zoom:5
+});
+
+/* ================= GPS ================= */
+window.previewLocation=()=>{
+  navigator.geolocation.getCurrentPosition(p=>{
+    gpsPoint={
+      latitude:p.coords.latitude,
+      longitude:p.coords.longitude,
+      accuracy:Math.round(p.coords.accuracy)
     };
+
+    mapDiv.style.height="220px";
+    const pt=new Point(gpsPoint);
+    view.center=pt;
+    view.zoom=18;
+    view.graphics.removeAll();
+    view.graphics.add(new Graphic({
+      geometry:pt,
+      symbol:{type:"simple-marker",color:"red",size:10}
+    }));
+    status.innerText="📍 GPS Accuracy "+gpsPoint.accuracy+" m";
+  },()=>alert("GPS error"));
+};
+
+/* ================= OFFLINE STORAGE ================= */
+function getOffline(){
+  return JSON.parse(localStorage.getItem("offlineSites")||"[]");
+}
+function setOffline(d){
+  localStorage.setItem("offlineSites",JSON.stringify(d));
+  offlineCount.innerText="Offline Records: "+d.length;
 }
 
-/* ------------------ VIEW OFFLINE RECORDS ------------------ */
-function toggleOfflineList() {
-    const listDiv = document.getElementById("offlineList");
+/* ================= UPLOAD / SAVE ================= */
+window.uploadData=async()=>{
+  if(!photoBase64){alert("Pehle photo lo");return;}
+  if(!gpsPoint){alert("Pehle Preview Location karo");return;}
 
-    if (listDiv.style.display === "block") {
-        listDiv.style.display = "none";
-        return;
+  const record={
+    attributes:{
+      CLUSTER:CLUSTER.value,
+      SITE_NAME:SITE_NAME.value,
+      DATE:DATE.value,
+      COMPONENTS:COMPONENTS.value,
+      SUBCOMPONENTS:SUBCOMPONENTS.value,
+      PROJECT:PROJECT.value,
+      REMARKS:REMARKS.value
+    },
+    gpsPoint:gpsPoint,
+    photoBase64:photoBase64,
+    time:new Date().toLocaleString()
+  };
+
+  if(!navigator.onLine){
+    const d=getOffline();
+    d.push(record);
+    setOffline(d);
+    status.innerText="📴 Saved Offline Successfully";
+    return;
+  }
+
+  await uploadSingle(record);
+  status.innerText="✅ Uploaded Successfully";
+};
+
+/* ================= VIEW OFFLINE RECORDS (FIXED) ================= */
+window.toggleOfflineList=()=>{
+
+  const data=getOffline();
+  offlineList.innerHTML="";
+
+  if(data.length===0){
+    alert("No offline records found");
+    offlineList.style.display="none";
+    return;
+  }
+
+  data.forEach((r,i)=>{
+    const div=document.createElement("div");
+    div.style.borderBottom="1px solid #ccc";
+    div.style.padding="6px 0";
+    div.innerHTML=`
+      <b>${i+1}. ${r.attributes.SITE_NAME||"No Name"}</b><br>
+      ${r.time}<br>
+      Lat:${r.gpsPoint.latitude.toFixed(5)},
+      Lon:${r.gpsPoint.longitude.toFixed(5)}
+    `;
+    offlineList.appendChild(div);
+  });
+
+  offlineList.style.display =
+    offlineList.style.display==="block"?"none":"block";
+};
+
+/* ================= SYNC ================= */
+window.syncOfflineData=async()=>{
+  if(!navigator.onLine){alert("No Internet");return;}
+  for(const r of getOffline()) await uploadSingle(r);
+  setOffline([]);
+  offlineList.style.display="none";
+  status.innerText="✅ Offline data synced";
+};
+
+async function uploadSingle(r){
+  const pt=new Point(r.gpsPoint);
+  const add=await esriRequest(FEATURE_URL+"/addFeatures",{
+    method:"post",
+    query:{
+      f:"json",
+      features:JSON.stringify([{geometry:pt,attributes:r.attributes}])
     }
-
-    listDiv.innerHTML = "";
-    listDiv.style.display = "block";
-
-    const tx = db.transaction("sites", "readonly");
-    const store = tx.objectStore("sites");
-
-    store.openCursor().onsuccess = function (e) {
-        const cursor = e.target.result;
-        if (cursor) {
-            const div = document.createElement("div");
-            div.className = "record";
-            div.innerHTML =
-                "<b>" + cursor.value.siteName + "</b><br>" +
-                cursor.value.time;
-            listDiv.appendChild(div);
-            cursor.continue();
-        }
-    };
+  });
+  const oid=add.data.addResults[0].objectId;
+  const blob=await fetch(r.photoBase64).then(r=>r.blob());
+  const fd=new FormData();
+  fd.append("attachment",blob,"photo.jpg");
+  fd.append("f","json");
+  await fetch(FEATURE_URL+"/"+oid+"/addAttachment",{method:"POST",body:fd});
 }
+
+/* INIT */
+setOffline(getOffline());
+window.addEventListener("online",syncOfflineData);
+
+});
 </script>
-
 </body>
 </html>
