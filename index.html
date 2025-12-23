@@ -47,6 +47,13 @@ button{
   font-weight:bold;
 }
 .secondary{background:#555;color:#fff}
+
+/* ✅ success green */
+.success{
+  background:#1e7e34 !important;
+  color:#fff;
+}
+
 video{
   width:100%;
   border-radius:10px;
@@ -73,6 +80,13 @@ video{
   font-size:13px;
   font-weight:bold;
 }
+
+/* ✅ new site */
+#newSiteBtn{
+  display:none;
+  background:#0066cc;
+  color:#fff;
+}
 </style>
 </head>
 
@@ -96,9 +110,11 @@ video{
 <video id="video" autoplay playsinline></video>
 
 <button onclick="previewLocation()">🗺️ Preview Location</button>
-<button onclick="uploadData()">⬆ Upload / Save</button>
+<button id="uploadBtn" onclick="uploadData()">⬆ Upload / Save</button>
 <button onclick="syncOfflineData()" class="secondary">🔄 Sync Offline</button>
 <button onclick="toggleOfflineList()" class="secondary">📂 View Offline Records</button>
+
+<button id="newSiteBtn" onclick="resetForm()">➕ New Site</button>
 
 <div id="offlineCount">Offline Records: 0</div>
 <div id="mapDiv"></div>
@@ -163,7 +179,6 @@ window.capturePhoto=()=>{
 const map=new Map({
   basemap: navigator.onLine ? "satellite" : null
 });
-
 const view=new MapView({
   container:"mapDiv",
   map:map,
@@ -178,7 +193,6 @@ window.previewLocation=()=>{
       longitude:p.coords.longitude,
       accuracy:Math.round(p.coords.accuracy)
     };
-
     mapDiv.style.height="220px";
     const pt=new Point(gpsPoint);
     view.center=pt;
@@ -192,7 +206,7 @@ window.previewLocation=()=>{
   },()=>alert("GPS error"));
 };
 
-/* ================= OFFLINE STORAGE ================= */
+/* ================= OFFLINE ================= */
 function getOffline(){
   return JSON.parse(localStorage.getItem("offlineSites")||"[]");
 }
@@ -203,6 +217,9 @@ function setOffline(d){
 
 /* ================= UPLOAD / SAVE ================= */
 window.uploadData=async()=>{
+  uploadBtn.innerText="⏳ Processing...";
+  uploadBtn.classList.remove("success");
+
   if(!photoBase64){alert("Pehle photo lo");return;}
   if(!gpsPoint){alert("Pehle Preview Location karo");return;}
 
@@ -225,40 +242,33 @@ window.uploadData=async()=>{
     const d=getOffline();
     d.push(record);
     setOffline(d);
+
     status.innerText="📴 Saved Offline Successfully";
+    uploadBtn.innerText="✔ Saved Offline";
+    uploadBtn.classList.add("success");
+    newSiteBtn.style.display="block";
     return;
   }
 
   await uploadSingle(record);
+
   status.innerText="✅ Uploaded Successfully";
+  uploadBtn.innerText="✔ Uploaded";
+  uploadBtn.classList.add("success");
+  newSiteBtn.style.display="block";
 };
 
-/* ================= VIEW OFFLINE RECORDS (FIXED) ================= */
+/* ================= VIEW OFFLINE ================= */
 window.toggleOfflineList=()=>{
-
   const data=getOffline();
   offlineList.innerHTML="";
-
-  if(data.length===0){
-    alert("No offline records found");
-    offlineList.style.display="none";
-    return;
-  }
-
+  if(data.length===0){alert("No offline records");return;}
   data.forEach((r,i)=>{
-    const div=document.createElement("div");
-    div.style.borderBottom="1px solid #ccc";
-    div.style.padding="6px 0";
-    div.innerHTML=`
-      <b>${i+1}. ${r.attributes.SITE_NAME||"No Name"}</b><br>
-      ${r.time}<br>
-      Lat:${r.gpsPoint.latitude.toFixed(5)},
-      Lon:${r.gpsPoint.longitude.toFixed(5)}
-    `;
-    offlineList.appendChild(div);
+    const d=document.createElement("div");
+    d.innerHTML=`<b>${i+1}. ${r.attributes.SITE_NAME||"No Name"}</b><br>${r.time}<hr>`;
+    offlineList.appendChild(d);
   });
-
-  offlineList.style.display =
+  offlineList.style.display=
     offlineList.style.display==="block"?"none":"block";
 };
 
@@ -267,7 +277,6 @@ window.syncOfflineData=async()=>{
   if(!navigator.onLine){alert("No Internet");return;}
   for(const r of getOffline()) await uploadSingle(r);
   setOffline([]);
-  offlineList.style.display="none";
   status.innerText="✅ Offline data synced";
 };
 
@@ -287,6 +296,19 @@ async function uploadSingle(r){
   fd.append("f","json");
   await fetch(FEATURE_URL+"/"+oid+"/addAttachment",{method:"POST",body:fd});
 }
+
+/* ================= NEW SITE ================= */
+window.resetForm=()=>{
+  document.querySelectorAll("input").forEach(i=>i.value="");
+  photoBase64=null;
+  gpsPoint=null;
+  view.graphics.removeAll();
+  mapDiv.style.height="0";
+  uploadBtn.innerText="⬆ Upload / Save";
+  uploadBtn.classList.remove("success");
+  newSiteBtn.style.display="none";
+  status.innerText="Ready for new site";
+};
 
 /* INIT */
 setOffline(getOffline());
