@@ -166,7 +166,7 @@ window.previewLocation=()=>{
       symbol:{type:"simple-marker",color:"red",size:10}
     }));
 
-    if(gpsPoint.accuracy>10){
+    if(gpsPoint.accuracy>30){
       status.innerText="⚠ GPS weak ("+gpsPoint.accuracy+"m)";
       uploadBtn.disabled=true;
     }else{
