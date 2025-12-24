@@ -2,7 +2,8 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="viewport"
+ content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 
 <title>SITE_LOCATION – GIS Field Survey</title>
 
@@ -12,68 +13,92 @@
 <style>
 *{box-sizing:border-box}
 body{
-  margin:0;min-height:100vh;
-  font-family:Segoe UI,Arial;
+  margin:0;
+  min-height:100vh;
+  font-family:Segoe UI, Arial, sans-serif;
   background:linear-gradient(135deg,#0f2027,#203a43,#2c5364);
-  display:flex;justify-content:center;align-items:center;
+  display:flex;
+  align-items:center;
+  justify-content:center;
 }
 .box{
-  background:#fff;width:100%;max-width:420px;
-  padding:18px;border-radius:18px;
+  background:#fff;
+  width:100%;
+  max-width:440px;
+  padding:18px;
+  border-radius:18px;
   box-shadow:0 15px 40px rgba(0,0,0,.35);
 }
 h2{text-align:center;font-size:17px;color:#0b3c5d}
-.field-group{display:grid;grid-template-columns:1fr 1fr;gap:8px}
-input{padding:9px;border-radius:8px;border:1px solid #ccc;font-size:13px}
+.field-group{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:8px;
+}
+input{
+  width:100%;
+  padding:9px;
+  font-size:13px;
+  border-radius:8px;
+  border:1px solid #ccc;
+}
 .full{grid-column:span 2}
 button{
-  width:100%;padding:11px;margin-top:7px;
-  border:none;border-radius:10px;font-weight:600;cursor:pointer
+  width:100%;
+  padding:11px;
+  margin-top:7px;
+  font-weight:600;
+  border:none;
+  border-radius:10px;
 }
 .secondary{background:#4b5563;color:#fff}
 .success{background:#28a745!important;color:#fff}
+video,img{width:100%;border-radius:12px;margin-top:6px}
 #mapDiv{height:0;margin-top:8px;border-radius:12px;overflow:hidden}
 #offlineList{display:none;font-size:12px;border:1px solid #ccc;padding:8px;margin-top:8px}
 #status{text-align:center;font-weight:600;margin-top:6px}
-#offlineCount{text-align:center;margin-top:6px;font-weight:600}
-video,img{width:100%;border-radius:12px;margin-top:6px}
+#offlineCount{margin-top:6px;text-align:center;font-weight:600}
 </style>
 </head>
 
 <body>
 <div class="box">
+
 <h2>KALPATARU PROJECTS<br>SITE SURVEY</h2>
 
 <div class="field-group">
-<input id="CLUSTER" placeholder="CLUSTER">
-<input id="SITE_NAME" placeholder="SITE NAME">
-<input type="date" id="DATE">
-<input id="COMPONENTS" placeholder="COMPONENTS">
-<input id="SUBCOMPONENTS" class="full" placeholder="SUB COMPONENTS">
-<input id="PROJECT" class="full" placeholder="PROJECT">
-<input id="REMARKS" class="full" placeholder="REMARKS">
+  <input id="SURVEYOR" class="full" placeholder="Surveyor Name">
+  <input id="MOBILE" class="full" placeholder="Mobile No">
+  <input id="CLUSTER" placeholder="CLUSTER">
+  <input id="SITE_NAME" placeholder="SITE NAME">
+  <input type="date" id="DATE">
+  <input id="COMPONENTS" placeholder="COMPONENTS">
+  <input id="SUBCOMPONENTS" class="full" placeholder="SUB COMPONENTS">
+  <input id="PROJECT" class="full" placeholder="PROJECT">
+  <input id="REMARKS" class="full" placeholder="REMARKS">
 </div>
+
+<select onchange="setBasemap(this.value)">
+  <option value="satellite">🛰 Satellite</option>
+  <option value="streets">🗺 Streets</option>
+  <option value="terrain">🌍 Terrain</option>
+</select>
 
 <button id="cameraToggleBtn" class="secondary">📷 Start Camera</button>
 <button onclick="capturePhoto()">📸 Capture Photo</button>
 <div id="photoPreview"></div>
 <video id="video" autoplay playsinline></video>
 
-<select onchange="setBasemap(this.value)">
-<option value="satellite">🛰 Satellite</option>
-<option value="streets">🗺 Streets</option>
-<option value="terrain">🌍 Terrain</option>
-</select>
-
 <button onclick="previewLocation()">🗺 Preview Location</button>
 <button id="uploadBtn" onclick="uploadData()">⬆ Upload / Save</button>
 <button onclick="toggleOfflineList()" class="secondary">📂 View Offline</button>
-<button id="newSiteBtn" onclick="resetForm()" style="display:none">➕ New Site</button>
+<button onclick="resetForm()" id="newSiteBtn" style="display:none" class="secondary">➕ New Site</button>
 
-<div id="offlineCount">Offline Records: 0</div>
+<div id="offlineCount"></div>
 <div id="mapDiv"></div>
 <div id="offlineList"></div>
 <div id="status"></div>
+
 </div>
 
 <script>
@@ -85,28 +110,22 @@ require([
 
 const FEATURE_URL="https://services.arcgis.com/NJ6dRODVurthn1U5/arcgis/rest/services/SITE_LOCATION/FeatureServer/0";
 
+DATE.value=new Date().toISOString().split("T")[0];
+
 let cameraStream=null;
 let photoList=[];
 let gpsPoint=null;
 let watchId=null;
 
-/* AUTO DATE */
-DATE.value=new Date().toISOString().split("T")[0];
-
 /* CAMERA */
 cameraToggleBtn.onclick=async()=>{
- if(cameraStream) return;
- cameraStream=await navigator.mediaDevices.getUserMedia({
-  video:{facingMode:{ideal:"environment"}}
- });
+ cameraStream=await navigator.mediaDevices.getUserMedia({video:{facingMode:"environment"}});
  video.srcObject=cameraStream;
  video.style.display="block";
 };
-
 window.capturePhoto=()=>{
  const c=document.createElement("canvas");
- c.width=video.videoWidth;
- c.height=video.videoHeight;
+ c.width=video.videoWidth; c.height=video.videoHeight;
  c.getContext("2d").drawImage(video,0,0);
  const img=c.toDataURL("image/jpeg",0.7);
  photoList.push(img);
@@ -115,33 +134,29 @@ window.capturePhoto=()=>{
 
 /* MAP */
 const map=new Map({basemap:"satellite"});
-const view=new MapView({container:"mapDiv",map:map,zoom:5});
+const view=new MapView({container:"mapDiv",map,zoom:5});
 window.setBasemap=b=>map.basemap=b;
 
 /* LIVE GPS */
 window.previewLocation=()=>{
  mapDiv.style.height="220px";
  watchId=navigator.geolocation.watchPosition(p=>{
-  const acc=Math.round(p.coords.accuracy);
-  if(acc>10){
-    status.innerText="⚠ GPS weak ("+acc+"m)";
+  if(p.coords.accuracy>10){
     uploadBtn.disabled=true;
+    status.innerText="⚠ GPS weak, thoda ruk jao ("+Math.round(p.coords.accuracy)+"m)";
     return;
   }
   uploadBtn.disabled=false;
-  gpsPoint={latitude:p.coords.latitude,longitude:p.coords.longitude};
-  const pt=new Point(gpsPoint);
+  gpsPoint=p.coords;
+  const pt=new Point({latitude:p.coords.latitude,longitude:p.coords.longitude});
   view.center=pt; view.zoom=18;
   view.graphics.removeAll();
-  view.graphics.add(new Graphic({
-   geometry:pt,
-   symbol:{type:"simple-marker",color:"red",size:10}
-  }));
-  status.innerText="📍 GPS OK ("+acc+"m)";
+  view.graphics.add(new Graphic({geometry:pt,symbol:{type:"simple-marker",color:"red"}}));
+  status.innerText="📍 Accuracy "+Math.round(p.coords.accuracy)+" m";
  });
 };
 
-/* OFFLINE STORAGE */
+/* OFFLINE */
 function getOffline(){return JSON.parse(localStorage.getItem("offlineSites")||"[]")}
 function setOffline(d){
  localStorage.setItem("offlineSites",JSON.stringify(d));
@@ -150,25 +165,17 @@ function setOffline(d){
 
 /* UPLOAD */
 window.uploadData=async()=>{
- if(!gpsPoint||photoList.length===0){alert("GPS / Photo missing");return;}
-
- uploadBtn.disabled=true;
-
+ if(!gpsPoint||photoList.length===0){alert("GPS & Photo required");return;}
  const rec={
   attributes:{
-   CLUSTER:CLUSTER.value,
-   SITE_NAME:SITE_NAME.value,
-   DATE:DATE.value,
-   COMPONENTS:COMPONENTS.value,
-   SUBCOMPONENTS:SUBCOMPONENTS.value,
-   PROJECT:PROJECT.value,
+   SURVEYOR:SURVEYOR.value,MOBILE:MOBILE.value,
+   CLUSTER:CLUSTER.value,SITE_NAME:SITE_NAME.value,
+   DATE:DATE.value,COMPONENTS:COMPONENTS.value,
+   SUBCOMPONENTS:SUBCOMPONENTS.value,PROJECT:PROJECT.value,
    REMARKS:REMARKS.value
   },
-  gpsPoint:gpsPoint,
-  photos:photoList,
-  time:new Date().toLocaleString()
+  gps:gpsPoint,photos:photoList,time:new Date().toLocaleString()
  };
-
  if(!navigator.onLine){
   const d=getOffline(); d.push(rec); setOffline(d);
   uploadBtn.classList.add("success");
@@ -176,19 +183,39 @@ window.uploadData=async()=>{
   newSiteBtn.style.display="block";
   return;
  }
-
  await uploadSingle(rec);
  uploadBtn.classList.add("success");
  uploadBtn.innerText="✔ Uploaded";
  newSiteBtn.style.display="block";
 };
 
-/* UPLOAD SINGLE */
+/* OFFLINE VIEW */
+window.toggleOfflineList=()=>{
+ const d=getOffline(); offlineList.innerHTML="";
+ d.forEach((r,i)=>{
+  offlineList.innerHTML+=`
+  <b>${i+1}. ${r.attributes.SITE_NAME}</b><br>
+  ${r.time}<br>
+  Photos: ${r.photos.length}<hr>`;
+ });
+ offlineList.style.display="block";
+};
+
+/* SYNC */
+window.syncOfflineData=async()=>{
+ if(!navigator.onLine) return;
+ const d=getOffline();
+ for(const r of d) await uploadSingle(r);
+ setOffline([]);
+ status.innerText="✅ Offline synced";
+};
+window.addEventListener("online",syncOfflineData);
+
 async function uploadSingle(r){
- const pt=new Point(r.gpsPoint);
+ const pt=new Point(r.gps);
  const add=await esriRequest(FEATURE_URL+"/addFeatures",{
-  method:"post",
-  query:{f:"json",features:JSON.stringify([{geometry:pt,attributes:r.attributes}])}
+  method:"post",query:{f:"json",
+  features:JSON.stringify([{geometry:pt,attributes:r.attributes}])}
  });
  const oid=add.data.addResults[0].objectId;
  for(const p of r.photos){
@@ -200,29 +227,6 @@ async function uploadSingle(r){
  }
 }
 
-/* OFFLINE VIEW */
-window.toggleOfflineList=()=>{
- const d=getOffline(); offlineList.innerHTML="";
- d.forEach((r,i)=>{
-  offlineList.innerHTML+=`
-  <b>${i+1}. ${r.attributes.SITE_NAME}</b><br>
-  ${r.time}<br>
-  Photos: ${r.photos.length}<br>
-  Lat:${r.gpsPoint.latitude.toFixed(5)},
-  Lon:${r.gpsPoint.longitude.toFixed(5)}<hr>`;
- });
- offlineList.style.display=
-  offlineList.style.display==="block"?"none":"block";
-};
-
-/* AUTO SYNC */
-window.addEventListener("online",async()=>{
- const d=getOffline();
- for(const r of d) await uploadSingle(r);
- setOffline([]);
- status.innerText="✅ Offline data uploaded";
-});
-
 /* RESET */
 window.resetForm=()=>{
  document.querySelectorAll("input").forEach(i=>i.value="");
@@ -233,7 +237,6 @@ window.resetForm=()=>{
  uploadBtn.innerText="⬆ Upload / Save";
  uploadBtn.disabled=false;
  newSiteBtn.style.display="none";
- status.innerText="Ready for new site";
 };
 
 setOffline(getOffline());
