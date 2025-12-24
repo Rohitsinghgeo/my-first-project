@@ -27,47 +27,74 @@ body{
   max-width:420px;
   padding:18px;
   border-radius:18px;
+  box-shadow:0 15px 40px rgba(0,0,0,.35);
 }
-button,select,input{
+h2{text-align:center;font-size:17px;color:#0b3c5d}
+.field-group{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:8px;
+}
+input,select{
   width:100%;
-  padding:10px;
-  margin-top:6px;
+  padding:9px;
+  font-size:13px;
   border-radius:8px;
+  border:1px solid #ccc;
 }
+input.required-error{
+  border:2px solid red;
+}
+.full{grid-column:span 2}
+button{
+  width:100%;
+  padding:11px;
+  margin-top:7px;
+  font-weight:600;
+  border:none;
+  border-radius:10px;
+  cursor:pointer;
+}
+.secondary{background:#4b5563;color:#fff}
+.success{background:#28a745!important;color:#fff}
 #mapDiv{
   height:0;
   margin-top:8px;
-  border-radius:10px;
+  border-radius:12px;
   overflow:hidden;
 }
-video{
-  width:100%;
-  display:none;
-  border-radius:10px;
-}
+video{width:100%;display:none;border-radius:12px}
+#status{text-align:center;margin-top:6px;font-weight:600}
 </style>
 </head>
 
 <body>
 <div class="box">
 
-<h3>KALPATARU PROJECTS<br>SITE SURVEY</h3>
+<h2>KALPATARU PROJECTS<br>SITE SURVEY</h2>
 
-<input id="CLUSTER" placeholder="CLUSTER">
-<input id="SITE_NAME" placeholder="SITE NAME">
-<input type="date" id="DATE">
+<div class="field-group">
+  <input id="CLUSTER" placeholder="CLUSTER *">
+  <input id="SITE_NAME" placeholder="SITE NAME *">
+  <input type="date" id="DATE">
+  <input id="COMPONENTS" placeholder="COMPONENTS">
+  <input id="SURVEYOR" placeholder="SURVEYOR NAME">
+  <input id="MOBILE" placeholder="MOBILE NO">
+  <input id="PROJECT" class="full" placeholder="PROJECT">
+</div>
 
-<select id="basemapSelect">
+<select id="basemapSelect" class="full">
   <option value="satellite">🛰 Satellite</option>
   <option value="streets">🗺 Streets</option>
   <option value="terrain">🌍 Terrain</option>
 </select>
 
-<button id="cameraToggleBtn">📷 Start Camera</button>
+<button id="cameraToggleBtn" class="secondary">📷 Start Camera</button>
 <button onclick="capturePhoto()">📸 Capture Photo</button>
 <video id="video" autoplay playsinline></video>
 
-<button onclick="previewLocation()">🗺️ Preview Location</button>
+<button onclick="previewLocation()">🗺 Preview Location</button>
+<button id="uploadBtn" onclick="uploadData()">⬆ Upload / Save</button>
 
 <div id="mapDiv"></div>
 <div id="status"></div>
@@ -76,34 +103,33 @@ video{
 
 <script>
 require([
-  "esri/Map",
-  "esri/views/MapView",
-  "esri/geometry/Point",
-  "esri/Graphic"
-], function(Map, MapView, Point, Graphic){
+  "esri/Map","esri/views/MapView",
+  "esri/geometry/Point","esri/Graphic"
+], function (Map, MapView, Point, Graphic) {
 
-/* ================= VARIABLES ================= */
 let cameraStream=null;
 let photoBase64=null;
 let gpsPoint=null;
 
-/* ================= MAP ================= */
-const map=new Map({ basemap:"satellite" });
+/* AUTO DATE */
+DATE.value = new Date().toISOString().split("T")[0];
 
-const view=new MapView({
+/* MAP */
+const map = new Map({ basemap:"satellite" });
+const view = new MapView({
   container:"mapDiv",
   map:map,
   center:[78.9629,20.5937],
   zoom:4
 });
 
-/* Basemap switch */
-basemapSelect.onchange=()=>{
+/* BASEMAP SWITCH */
+basemapSelect.onchange = ()=>{
   map.basemap = basemapSelect.value;
 };
 
-/* ================= CAMERA ================= */
-cameraToggleBtn.onclick=async()=>{
+/* CAMERA – BACK CAMERA */
+cameraToggleBtn.onclick = async ()=>{
   if(!cameraStream){
     cameraStream = await navigator.mediaDevices.getUserMedia({
       video:{ facingMode:{ exact:"environment" } }
@@ -111,13 +137,15 @@ cameraToggleBtn.onclick=async()=>{
     video.srcObject=cameraStream;
     video.style.display="block";
     cameraToggleBtn.innerText="⏹ Stop Camera";
-  }else{
-    cameraStream.getTracks().forEach(t=>t.stop());
-    cameraStream=null;
-    video.style.display="none";
-    cameraToggleBtn.innerText="📷 Start Camera";
-  }
+  }else stopCamera();
 };
+
+function stopCamera(){
+  cameraStream.getTracks().forEach(t=>t.stop());
+  cameraStream=null;
+  video.style.display="none";
+  cameraToggleBtn.innerText="📷 Start Camera";
+}
 
 window.capturePhoto=()=>{
   if(!cameraStream){alert("Camera ON karo");return;}
@@ -126,46 +154,48 @@ window.capturePhoto=()=>{
   c.height=video.videoHeight;
   c.getContext("2d").drawImage(video,0,0);
   photoBase64=c.toDataURL("image/jpeg",0.7);
+  stopCamera();
   status.innerText="📸 Photo captured";
 };
 
-/* ================= GPS PREVIEW ================= */
+/* GPS PREVIEW – FIXED */
 window.previewLocation=()=>{
-  if(!navigator.geolocation){
-    alert("GPS not supported");
-    return;
+  navigator.geolocation.getCurrentPosition(p=>{
+    if(p.coords.accuracy>10){
+      status.innerText="⚠ GPS Weak ("+Math.round(p.coords.accuracy)+"m)";
+      uploadBtn.disabled=true;
+      return;
+    }
+    uploadBtn.disabled=false;
+    gpsPoint={
+      latitude:p.coords.latitude,
+      longitude:p.coords.longitude
+    };
+    mapDiv.style.height="220px";
+    const pt=new Point(gpsPoint);
+    view.center=pt;
+    view.zoom=18;
+    view.graphics.removeAll();
+    view.graphics.add(new Graphic({
+      geometry:pt,
+      symbol:{type:"simple-marker",color:"red",size:10}
+    }));
+    status.innerText="📍 GPS Locked";
+  },()=>alert("GPS Error"));
+};
+
+/* UPLOAD */
+window.uploadData=()=>{
+  let ok=true;
+  [CLUSTER,SITE_NAME,DATE].forEach(i=>{
+    i.classList.remove("required-error");
+    if(!i.value){i.classList.add("required-error");ok=false;}
+  });
+  if(!ok){alert("Mandatory fields missing");return;}
+  if(!photoBase64 || !gpsPoint){
+    alert("Photo & GPS required");return;
   }
-
-  navigator.geolocation.getCurrentPosition(
-    pos=>{
-      gpsPoint={
-        latitude:pos.coords.latitude,
-        longitude:pos.coords.longitude,
-        accuracy:Math.round(pos.coords.accuracy)
-      };
-
-      mapDiv.style.height="220px";
-
-      const pt=new Point({
-        latitude:gpsPoint.latitude,
-        longitude:gpsPoint.longitude
-      });
-
-      view.center=pt;
-      view.zoom=18;
-      view.graphics.removeAll();
-      view.graphics.add(new Graphic({
-        geometry:pt,
-        symbol:{ type:"simple-marker", color:"red", size:10 }
-      }));
-
-      status.innerText="📍 GPS Accuracy "+gpsPoint.accuracy+" m";
-    },
-    err=>{
-      alert("GPS error: location allow karo");
-    },
-    { enableHighAccuracy:true }
-  );
+  status.innerText="✅ Data ready to upload";
 };
 
 });
