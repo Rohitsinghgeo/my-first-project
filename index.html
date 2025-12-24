@@ -157,15 +157,17 @@ DATE.value=new Date().toISOString().split("T")[0];
 
 /* CAMERA */
 cameraToggleBtn.onclick=async()=>{
-  if(!cameraStream){
+  try{
     cameraStream=await navigator.mediaDevices.getUserMedia({
       video:{facingMode:{exact:"environment"}}
-    }).catch(()=>navigator.mediaDevices.getUserMedia({
+    });
+  }catch{
+    cameraStream=await navigator.mediaDevices.getUserMedia({
       video:{facingMode:"environment"}
-    }));
-    video.srcObject=cameraStream;
-    video.style.display="block";
+    });
   }
+  video.srcObject=cameraStream;
+  video.style.display="block";
 };
 
 window.capturePhoto=()=>{
@@ -173,8 +175,10 @@ window.capturePhoto=()=>{
   c.width=video.videoWidth;
   c.height=video.videoHeight;
   c.getContext("2d").drawImage(video,0,0);
-  photoBase64=c.toDataURL("image/jpeg",0.7);
-  status.innerText="📸 Photo Captured";
+  const img=c.toDataURL("image/jpeg",0.7);
+  photoList.push(img);
+  photoPreview.innerHTML+=`<img src="${img}">`;
+  status.innerText="📸 Photo added ("+photoList.length+")";
 };
 
 /* MAP */
