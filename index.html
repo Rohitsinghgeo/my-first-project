@@ -2,7 +2,8 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="viewport"
+ content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 
 <title>SITE_LOCATION – GIS Field Survey</title>
 
@@ -25,13 +26,18 @@ body{
 .box{
   background:#fff;
   width:100%;
-  max-width:430px;
+  max-width:420px;
   padding:18px;
   border-radius:18px;
   box-shadow:0 15px 40px rgba(0,0,0,.35);
 }
 
-h2{text-align:center;font-size:17px;color:#0b3c5d}
+h2{
+  text-align:center;
+  font-size:17px;
+  color:#0b3c5d;
+  margin-bottom:12px;
+}
 
 .field-group{
   display:grid;
@@ -39,7 +45,7 @@ h2{text-align:center;font-size:17px;color:#0b3c5d}
   gap:8px;
 }
 
-input,select{
+input, select{
   width:100%;
   padding:9px;
   font-size:13px;
@@ -47,34 +53,44 @@ input,select{
   border:1px solid #ccc;
 }
 
-input:focus,select:focus{
-  outline:none;
-  border-color:#0077b6;
-}
-
-.required{border-color:red}
-
 .full{grid-column:span 2}
 
 button{
   width:100%;
   padding:11px;
-  margin-top:6px;
+  margin-top:7px;
   font-weight:600;
   border:none;
   border-radius:10px;
   cursor:pointer;
 }
 
-.secondary{background:#4b5563;color:#fff}
-.success{background:#28a745;color:#fff}
+.secondary{background:#4b5563;color:#fff;}
+.success{background:#28a745;color:#fff;}
 
-video{width:100%;border-radius:12px;display:none}
-img.preview{width:70px;border-radius:8px;margin:5px}
+video{
+  width:100%;
+  border-radius:12px;
+  display:none;
+  margin-top:6px;
+}
 
-#mapDiv{height:0;margin-top:8px;border-radius:12px;overflow:hidden}
-#offlineList{display:none;font-size:12px;border:1px solid #ddd;padding:8px;margin-top:6px}
-#status{margin-top:6px;font-weight:600;text-align:center}
+#mapDiv{
+  height:0;
+  margin-top:8px;
+  border-radius:12px;
+  overflow:hidden;
+}
+
+#status{
+  margin-top:8px;
+  padding:6px;
+  border-radius:8px;
+  font-size:13px;
+  font-weight:600;
+  text-align:center;
+  background:#eef2f7;
+}
 </style>
 </head>
 
@@ -84,158 +100,127 @@ img.preview{width:70px;border-radius:8px;margin:5px}
 <h2>KALPATARU PROJECTS<br>SITE SURVEY</h2>
 
 <div class="field-group">
-  <input id="SURVEYOR" placeholder="Surveyor Name">
-  <input id="MOBILE" placeholder="Mobile No">
-
   <input id="CLUSTER" placeholder="CLUSTER">
   <input id="SITE_NAME" placeholder="SITE NAME">
-
   <input type="date" id="DATE">
   <input id="COMPONENTS" placeholder="COMPONENTS">
-
-  <input id="SUBCOMPONENTS" class="full" placeholder="SUB COMPONENTS">
   <input id="PROJECT" class="full" placeholder="PROJECT">
-  <input id="REMARKS" class="full" placeholder="REMARKS">
 </div>
 
 <select id="basemapSelect">
-  <option value="satellite">🛰 Satellite</option>
   <option value="streets">🗺 Streets</option>
+  <option value="satellite">🛰 Satellite</option>
   <option value="terrain">🌍 Terrain</option>
 </select>
 
 <button id="cameraBtn" class="secondary">📷 Start Camera</button>
 <button onclick="capturePhoto()">📸 Capture Photo</button>
-
 <video id="video" autoplay playsinline></video>
-<div id="photoPreview"></div>
 
-<button onclick="previewLocation()">🗺 Preview Location</button>
-<button id="uploadBtn" onclick="uploadData()">⬆ Upload / Save</button>
-<button onclick="toggleOfflineList()" class="secondary">📂 Offline Records</button>
+<button onclick="previewLocation()">📍 Preview Location</button>
 
 <div id="mapDiv"></div>
-<div id="offlineList"></div>
-<div id="status"></div>
+
+<button onclick="uploadData()">⬆ Upload</button>
+
+<div id="status">Ready</div>
 
 </div>
 
 <script>
 require([
- "esri/Map","esri/views/MapView",
- "esri/geometry/Point","esri/Graphic","esri/request"
-], function(Map,MapView,Point,Graphic,esriRequest){
-
-const FEATURE_URL="YOUR_FEATURE_LAYER_URL_HERE";
+  "esri/Map","esri/views/MapView",
+  "esri/geometry/Point","esri/Graphic"
+], function (Map, MapView, Point, Graphic) {
 
 let cameraStream=null;
-let photos=[];
+let photoBase64=null;
 let gpsPoint=null;
 
-/* AUTO DATE */
-DATE.value=new Date().toISOString().split("T")[0];
-
-/* CAMERA (BACK) */
-cameraBtn.onclick=async()=>{
- if(!cameraStream){
-  cameraStream=await navigator.mediaDevices.getUserMedia({
-   video:{facingMode:{exact:"environment"}}
-  });
-  video.srcObject=cameraStream;
-  video.style.display="block";
-  cameraBtn.innerText="⏹ Stop Camera";
- }else stopCamera();
-};
-
-function stopCamera(){
- cameraStream.getTracks().forEach(t=>t.stop());
- cameraStream=null;
- video.style.display="none";
- cameraBtn.innerText="📷 Start Camera";
-}
-
-window.capturePhoto=()=>{
- if(!cameraStream){alert("Camera ON karo");return;}
- const c=document.createElement("canvas");
- c.width=video.videoWidth;
- c.height=video.videoHeight;
- c.getContext("2d").drawImage(video,0,0);
- const img=c.toDataURL("image/jpeg",0.7);
- photos.push(img);
-
- const im=document.createElement("img");
- im.src=img; im.className="preview";
- photoPreview.appendChild(im);
-};
-
 /* MAP */
-const map=new Map({basemap:"satellite"});
-const view=new MapView({container:"mapDiv",map:map,zoom:5});
+const map = new Map({ basemap:"streets" });
+
+const view = new MapView({
+  container:"mapDiv",
+  map:map,
+  center:[78,22],
+  zoom:4
+});
 
 /* BASEMAP SWITCH */
-basemapSelect.onchange=()=>map.basemap=basemapSelect.value;
+basemapSelect.onchange=()=>{
+  map.basemap = basemapSelect.value;
+};
 
-/* GPS */
-window.previewLocation=()=>{
- navigator.geolocation.getCurrentPosition(p=>{
-  if(p.coords.accuracy>10){
-   status.innerText="⚠ GPS weak ("+Math.round(p.coords.accuracy)+"m)";
-   uploadBtn.disabled=true;
-   return;
+/* CAMERA (BACK CAMERA FIXED) */
+cameraBtn.onclick = async ()=>{
+  try{
+    cameraStream = await navigator.mediaDevices.getUserMedia({
+      video:{ facingMode:{ exact:"environment" } }
+    });
+  }catch{
+    cameraStream = await navigator.mediaDevices.getUserMedia({
+      video:{ facingMode:"environment" }
+    });
   }
-  uploadBtn.disabled=false;
-
-  gpsPoint={latitude:p.coords.latitude,longitude:p.coords.longitude};
-  mapDiv.style.height="220px";
-  const pt=new Point(gpsPoint);
-  view.center=pt; view.zoom=18;
-  view.graphics.removeAll();
-  view.graphics.add(new Graphic({
-    geometry:pt,
-    symbol:{type:"simple-marker",color:"red",size:10}
-  }));
-  status.innerText="📍 GPS OK";
- });
+  video.srcObject=cameraStream;
+  video.style.display="block";
 };
 
-/* OFFLINE */
-function getOffline(){return JSON.parse(localStorage.getItem("sites")||"[]")}
-function setOffline(d){localStorage.setItem("sites",JSON.stringify(d))}
+/* CAPTURE PHOTO */
+window.capturePhoto=()=>{
+  if(!cameraStream){ alert("Camera ON karo"); return; }
+  const c=document.createElement("canvas");
+  c.width=video.videoWidth;
+  c.height=video.videoHeight;
+  c.getContext("2d").drawImage(video,0,0);
+  photoBase64=c.toDataURL("image/jpeg",0.7);
+  cameraStream.getTracks().forEach(t=>t.stop());
+  status.innerText="📸 Photo captured";
+};
 
-/* UPLOAD */
+/* GPS PREVIEW – FIXED */
+window.previewLocation=()=>{
+  mapDiv.style.height="230px";
+
+  view.when(()=>{
+    navigator.geolocation.getCurrentPosition(
+      pos=>{
+        gpsPoint={
+          latitude:pos.coords.latitude,
+          longitude:pos.coords.longitude,
+          accuracy:Math.round(pos.coords.accuracy)
+        };
+
+        const pt=new Point(gpsPoint);
+        view.center=pt;
+        view.zoom=18;
+
+        view.graphics.removeAll();
+        view.graphics.add(new Graphic({
+          geometry:pt,
+          symbol:{ type:"simple-marker", color:"red", size:10 }
+        }));
+
+        status.innerText=`📍 GPS Accuracy ${gpsPoint.accuracy} m`;
+      },
+      err=>alert("GPS Error: Permission ya signal issue"),
+      { enableHighAccuracy:true, timeout:15000 }
+    );
+  });
+};
+
+/* DUMMY UPLOAD */
 window.uploadData=()=>{
- if(!CLUSTER.value||!SITE_NAME.value||!DATE.value){
-  alert("Mandatory fields missing"); return;
- }
- if(!gpsPoint||photos.length===0){alert("GPS / Photo missing");return;}
-
- const rec={attrs:{
-  SURVEYOR:SURVEYOR.value,
-  MOBILE:MOBILE.value,
-  CLUSTER:CLUSTER.value,
-  SITE_NAME:SITE_NAME.value,
-  DATE:DATE.value
- },gps:gpsPoint,photos:photos};
-
- const d=getOffline(); d.push(rec); setOffline(d);
- status.innerText="Saved Offline";
-};
-
-/* VIEW OFFLINE */
-window.toggleOfflineList=()=>{
- offlineList.innerHTML="";
- getOffline().forEach((r,i)=>{
-  offlineList.innerHTML+=`${i+1}. ${r.attrs.SITE_NAME}
-  <button onclick="del(${i})">❌</button><hr>`;
- });
- offlineList.style.display="block";
-};
-
-window.del=i=>{
- const d=getOffline(); d.splice(i,1); setOffline(d); toggleOfflineList();
+  if(!gpsPoint || !photoBase64){
+    alert("Photo aur Location dono chahiye");
+    return;
+  }
+  status.innerText="✅ Data Ready for Upload";
 };
 
 });
 </script>
+
 </body>
 </html>
