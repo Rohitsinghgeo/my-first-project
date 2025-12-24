@@ -16,7 +16,7 @@ body{
   margin:0;
   min-height:100vh;
   font-family:Segoe UI, Arial, sans-serif;
-  background:linear-gradient(135deg,#0f2027,#203a43,#2c5364);
+  background:#0f2027;
   display:flex;
   align-items:center;
   justify-content:center;
@@ -24,12 +24,11 @@ body{
 .box{
   background:#fff;
   width:100%;
-  max-width:440px;
-  padding:18px;
-  border-radius:18px;
-  box-shadow:0 15px 40px rgba(0,0,0,.35);
+  max-width:420px;
+  padding:16px;
+  border-radius:16px;
 }
-h2{text-align:center;font-size:17px;color:#0b3c5d}
+h2{text-align:center;font-size:16px}
 .field-group{
   display:grid;
   grid-template-columns:1fr 1fr;
@@ -37,27 +36,28 @@ h2{text-align:center;font-size:17px;color:#0b3c5d}
 }
 input{
   width:100%;
-  padding:9px;
+  padding:8px;
   font-size:13px;
-  border-radius:8px;
+  border-radius:6px;
   border:1px solid #ccc;
 }
 .full{grid-column:span 2}
 button{
   width:100%;
-  padding:11px;
-  margin-top:7px;
+  padding:10px;
+  margin-top:6px;
   font-weight:600;
   border:none;
-  border-radius:10px;
+  border-radius:8px;
 }
 .secondary{background:#4b5563;color:#fff}
 .success{background:#28a745!important;color:#fff}
-video,img{width:100%;border-radius:12px;margin-top:6px}
-#mapDiv{height:0;margin-top:8px;border-radius:12px;overflow:hidden}
-#offlineList{display:none;font-size:12px;border:1px solid #ccc;padding:8px;margin-top:8px}
-#status{text-align:center;font-weight:600;margin-top:6px}
-#offlineCount{margin-top:6px;text-align:center;font-weight:600}
+#newSiteBtn{display:none;background:#0077ff;color:#fff}
+video,img{width:100%;border-radius:10px;margin-top:6px}
+#mapDiv{height:0;margin-top:8px;border-radius:10px;overflow:hidden}
+#offlineList{display:none;font-size:12px;border:1px solid #ccc;padding:6px;margin-top:6px}
+#status{text-align:center;margin-top:6px;font-weight:600}
+#offlineCount{text-align:center;font-size:13px;margin-top:6px}
 </style>
 </head>
 
@@ -67,8 +67,6 @@ video,img{width:100%;border-radius:12px;margin-top:6px}
 <h2>KALPATARU PROJECTS<br>SITE SURVEY</h2>
 
 <div class="field-group">
-  <input id="SURVEYOR" class="full" placeholder="Surveyor Name">
-  <input id="MOBILE" class="full" placeholder="Mobile No">
   <input id="CLUSTER" placeholder="CLUSTER">
   <input id="SITE_NAME" placeholder="SITE NAME">
   <input type="date" id="DATE">
@@ -78,7 +76,7 @@ video,img{width:100%;border-radius:12px;margin-top:6px}
   <input id="REMARKS" class="full" placeholder="REMARKS">
 </div>
 
-<select onchange="setBasemap(this.value)">
+<select onchange="setBasemap(this.value)" class="full">
   <option value="satellite">🛰 Satellite</option>
   <option value="streets">🗺 Streets</option>
   <option value="terrain">🌍 Terrain</option>
@@ -91,10 +89,11 @@ video,img{width:100%;border-radius:12px;margin-top:6px}
 
 <button onclick="previewLocation()">🗺 Preview Location</button>
 <button id="uploadBtn" onclick="uploadData()">⬆ Upload / Save</button>
+<button onclick="syncOfflineData()" class="secondary">🔄 Sync Offline</button>
 <button onclick="toggleOfflineList()" class="secondary">📂 View Offline</button>
-<button onclick="resetForm()" id="newSiteBtn" style="display:none" class="secondary">➕ New Site</button>
+<button id="newSiteBtn" onclick="resetForm()">➕ New Site</button>
 
-<div id="offlineCount"></div>
+<div id="offlineCount">Offline Records: 0</div>
 <div id="mapDiv"></div>
 <div id="offlineList"></div>
 <div id="status"></div>
@@ -103,143 +102,188 @@ video,img{width:100%;border-radius:12px;margin-top:6px}
 
 <script>
 require([
- "esri/Map","esri/views/MapView",
- "esri/geometry/Point","esri/Graphic",
- "esri/request"
-], function(Map,MapView,Point,Graphic,esriRequest){
+  "esri/Map","esri/views/MapView",
+  "esri/geometry/Point","esri/Graphic",
+  "esri/request"
+], function (Map, MapView, Point, Graphic, esriRequest) {
 
-const FEATURE_URL="https://services.arcgis.com/NJ6dRODVurthn1U5/arcgis/rest/services/SITE_LOCATION/FeatureServer/0";
+const FEATURE_URL =
+"https://services.arcgis.com/NJ6dRODVurthn1U5/arcgis/rest/services/SITE_LOCATION/FeatureServer/0";
 
 DATE.value=new Date().toISOString().split("T")[0];
 
 let cameraStream=null;
 let photoList=[];
 let gpsPoint=null;
-let watchId=null;
 
-/* CAMERA */
+/* CAMERA – BACK CAMERA */
 cameraToggleBtn.onclick=async()=>{
- cameraStream=await navigator.mediaDevices.getUserMedia({video:{facingMode:"environment"}});
- video.srcObject=cameraStream;
- video.style.display="block";
+  if(cameraStream){ stopCamera(); return; }
+  cameraStream=await navigator.mediaDevices.getUserMedia({
+    video:{facingMode:{exact:"environment"}}
+  });
+  video.srcObject=cameraStream;
+  video.style.display="block";
 };
+
+function stopCamera(){
+  cameraStream.getTracks().forEach(t=>t.stop());
+  cameraStream=null;
+  video.style.display="none";
+}
+
 window.capturePhoto=()=>{
- const c=document.createElement("canvas");
- c.width=video.videoWidth; c.height=video.videoHeight;
- c.getContext("2d").drawImage(video,0,0);
- const img=c.toDataURL("image/jpeg",0.7);
- photoList.push(img);
- photoPreview.innerHTML+=`<img src="${img}">`;
+  const c=document.createElement("canvas");
+  c.width=video.videoWidth;
+  c.height=video.videoHeight;
+  c.getContext("2d").drawImage(video,0,0);
+  const img=c.toDataURL("image/jpeg",0.7);
+  photoList.push(img);
+  photoPreview.innerHTML+=`<img src="${img}">`;
+  status.innerText="📸 Photo Added ("+photoList.length+")";
 };
 
 /* MAP */
-const map=new Map({basemap:"satellite"});
-const view=new MapView({container:"mapDiv",map,zoom:5});
+const map=new Map({ basemap:navigator.onLine?"satellite":null });
+const view=new MapView({ container:"mapDiv", map, zoom:5 });
 window.setBasemap=b=>map.basemap=b;
 
-/* LIVE GPS */
+/* LIVE GPS PREVIEW (WORKING) */
 window.previewLocation=()=>{
- mapDiv.style.height="220px";
- watchId=navigator.geolocation.watchPosition(p=>{
-  if(p.coords.accuracy>10){
-    uploadBtn.disabled=true;
-    status.innerText="⚠ GPS weak, thoda ruk jao ("+Math.round(p.coords.accuracy)+"m)";
-    return;
-  }
-  uploadBtn.disabled=false;
-  gpsPoint=p.coords;
-  const pt=new Point({latitude:p.coords.latitude,longitude:p.coords.longitude});
-  view.center=pt; view.zoom=18;
-  view.graphics.removeAll();
-  view.graphics.add(new Graphic({geometry:pt,symbol:{type:"simple-marker",color:"red"}}));
-  status.innerText="📍 Accuracy "+Math.round(p.coords.accuracy)+" m";
- });
+  navigator.geolocation.getCurrentPosition(p=>{
+    gpsPoint={
+      latitude:p.coords.latitude,
+      longitude:p.coords.longitude,
+      accuracy:Math.round(p.coords.accuracy)
+    };
+    mapDiv.style.height="220px";
+    const pt=new Point(gpsPoint);
+    view.center=pt;
+    view.zoom=18;
+    view.graphics.removeAll();
+    view.graphics.add(new Graphic({
+      geometry:pt,
+      symbol:{type:"simple-marker",color:"red",size:10}
+    }));
+
+    if(gpsPoint.accuracy>10){
+      status.innerText="⚠ GPS weak ("+gpsPoint.accuracy+"m)";
+      uploadBtn.disabled=true;
+    }else{
+      status.innerText="📍 GPS Accuracy "+gpsPoint.accuracy+" m";
+      uploadBtn.disabled=false;
+    }
+  },()=>alert("GPS error"));
 };
 
-/* OFFLINE */
-function getOffline(){return JSON.parse(localStorage.getItem("offlineSites")||"[]")}
+/* OFFLINE STORAGE */
+function getOffline(){
+  return JSON.parse(localStorage.getItem("offlineSites")||"[]");
+}
 function setOffline(d){
- localStorage.setItem("offlineSites",JSON.stringify(d));
- offlineCount.innerText="Offline Records: "+d.length;
+  localStorage.setItem("offlineSites",JSON.stringify(d));
+  offlineCount.innerText="Offline Records: "+d.length;
 }
 
 /* UPLOAD */
 window.uploadData=async()=>{
- if(!gpsPoint||photoList.length===0){alert("GPS & Photo required");return;}
- const rec={
-  attributes:{
-   SURVEYOR:SURVEYOR.value,MOBILE:MOBILE.value,
-   CLUSTER:CLUSTER.value,SITE_NAME:SITE_NAME.value,
-   DATE:DATE.value,COMPONENTS:COMPONENTS.value,
-   SUBCOMPONENTS:SUBCOMPONENTS.value,PROJECT:PROJECT.value,
-   REMARKS:REMARKS.value
-  },
-  gps:gpsPoint,photos:photoList,time:new Date().toLocaleString()
- };
- if(!navigator.onLine){
-  const d=getOffline(); d.push(rec); setOffline(d);
+  if(!gpsPoint||photoList.length===0){alert("Photo & Location required");return;}
+
+  uploadBtn.disabled=true;
+  uploadBtn.innerText="Processing...";
+
+  const record={
+    attributes:{
+      CLUSTER:CLUSTER.value,
+      SITE_NAME:SITE_NAME.value,
+      DATE:DATE.value,
+      COMPONENTS:COMPONENTS.value,
+      SUBCOMPONENTS:SUBCOMPONENTS.value,
+      PROJECT:PROJECT.value,
+      REMARKS:REMARKS.value
+    },
+    gpsPoint,
+    photos:photoList,
+    time:new Date().toLocaleString()
+  };
+
+  if(!navigator.onLine){
+    const d=getOffline(); d.push(record); setOffline(d);
+    uploadBtn.classList.add("success");
+    uploadBtn.innerText="✔ Saved Offline";
+    newSiteBtn.style.display="block";
+    return;
+  }
+
+  await uploadSingle(record);
   uploadBtn.classList.add("success");
-  uploadBtn.innerText="✔ Saved Offline";
+  uploadBtn.innerText="✔ Uploaded";
   newSiteBtn.style.display="block";
-  return;
- }
- await uploadSingle(rec);
- uploadBtn.classList.add("success");
- uploadBtn.innerText="✔ Uploaded";
- newSiteBtn.style.display="block";
 };
 
-/* OFFLINE VIEW */
-window.toggleOfflineList=()=>{
- const d=getOffline(); offlineList.innerHTML="";
- d.forEach((r,i)=>{
-  offlineList.innerHTML+=`
-  <b>${i+1}. ${r.attributes.SITE_NAME}</b><br>
-  ${r.time}<br>
-  Photos: ${r.photos.length}<hr>`;
- });
- offlineList.style.display="block";
-};
-
-/* SYNC */
-window.syncOfflineData=async()=>{
- if(!navigator.onLine) return;
- const d=getOffline();
- for(const r of d) await uploadSingle(r);
- setOffline([]);
- status.innerText="✅ Offline synced";
-};
-window.addEventListener("online",syncOfflineData);
-
+/* UPLOAD SINGLE */
 async function uploadSingle(r){
- const pt=new Point(r.gps);
- const add=await esriRequest(FEATURE_URL+"/addFeatures",{
-  method:"post",query:{f:"json",
-  features:JSON.stringify([{geometry:pt,attributes:r.attributes}])}
- });
- const oid=add.data.addResults[0].objectId;
- for(const p of r.photos){
-  const blob=await fetch(p).then(r=>r.blob());
-  const fd=new FormData();
-  fd.append("attachment",blob,"photo.jpg");
-  fd.append("f","json");
-  await fetch(FEATURE_URL+"/"+oid+"/addAttachment",{method:"POST",body:fd});
- }
+  const pt=new Point(r.gpsPoint);
+  const add=await esriRequest(FEATURE_URL+"/addFeatures",{
+    method:"post",
+    query:{
+      f:"json",
+      features:JSON.stringify([{geometry:pt,attributes:r.attributes}])
+    }
+  });
+  const oid=add.data.addResults[0].objectId;
+
+  for(const p of r.photos){
+    const blob=await fetch(p).then(r=>r.blob());
+    const fd=new FormData();
+    fd.append("attachment",blob,"photo.jpg");
+    fd.append("f","json");
+    await fetch(FEATURE_URL+"/"+oid+"/addAttachment",{method:"POST",body:fd});
+  }
 }
+
+/* VIEW OFFLINE */
+window.toggleOfflineList=()=>{
+  const d=getOffline();
+  offlineList.innerHTML="";
+  d.forEach((r,i)=>{
+    offlineList.innerHTML+=`
+    <b>${i+1}. ${r.attributes.SITE_NAME}</b><br>
+    ${r.time}<br>
+    Photos: ${r.photos.length}<hr>`;
+  });
+  offlineList.style.display=
+    offlineList.style.display==="block"?"none":"block";
+};
+
+/* AUTO SYNC */
+window.syncOfflineData=async()=>{
+  if(!navigator.onLine)return;
+  const d=getOffline();
+  for(const r of d) await uploadSingle(r);
+  setOffline([]);
+  offlineList.style.display="none";
+  status.innerText="✅ Offline data synced";
+};
 
 /* RESET */
 window.resetForm=()=>{
- document.querySelectorAll("input").forEach(i=>i.value="");
- photoList=[]; photoPreview.innerHTML="";
- gpsPoint=null; view.graphics.removeAll();
- mapDiv.style.height="0";
- uploadBtn.classList.remove("success");
- uploadBtn.innerText="⬆ Upload / Save";
- uploadBtn.disabled=false;
- newSiteBtn.style.display="none";
+  document.querySelectorAll("input").forEach(i=>i.value="");
+  DATE.value=new Date().toISOString().split("T")[0];
+  photoList=[];
+  photoPreview.innerHTML="";
+  gpsPoint=null;
+  view.graphics.removeAll();
+  mapDiv.style.height="0";
+  uploadBtn.disabled=false;
+  uploadBtn.classList.remove("success");
+  uploadBtn.innerText="⬆ Upload / Save";
+  newSiteBtn.style.display="none";
+  status.innerText="Ready for new site";
 };
 
 setOffline(getOffline());
+window.addEventListener("online",syncOfflineData);
 
 });
 </script>
