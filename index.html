@@ -135,7 +135,7 @@ window.setBasemap=b=>map.basemap=b;
 /* GPS – LIVE */
 window.previewLocation=()=>{
  navigator.geolocation.getCurrentPosition(p=>{
-  if(p.coords.accuracy>10){
+  if(p.coords.accuracy>150){
     status.innerText="⚠ GPS weak ("+Math.round(p.coords.accuracy)+"m)";
     uploadBtn.disabled=true;
     return;
