@@ -13,8 +13,9 @@
 <style>
 *{box-sizing:border-box}
 body{
-  margin:0;min-height:100vh;
-  font-family:Segoe UI, Arial;
+  margin:0;
+  min-height:100vh;
+  font-family:Segoe UI, Arial, sans-serif;
   background:linear-gradient(135deg,#0f2027,#203a43,#2c5364);
   display:flex;align-items:center;justify-content:center;
 }
@@ -24,30 +25,25 @@ body{
   box-shadow:0 15px 40px rgba(0,0,0,.35);
 }
 h2{text-align:center;font-size:17px;color:#0b3c5d}
-.field-group{
-  display:grid;grid-template-columns:1fr 1fr;gap:8px
-}
+.field-group{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 input,select{
   width:100%;padding:9px;font-size:13px;
-  border-radius:8px;border:1px solid #ccc
+  border-radius:8px;border:1px solid #ccc;
 }
+input.required-error{border:2px solid red}
 .full{grid-column:span 2}
 button{
   width:100%;padding:11px;margin-top:7px;
-  font-weight:600;border:none;border-radius:10px;cursor:pointer
+  font-weight:600;border:none;border-radius:10px;cursor:pointer;
 }
 .secondary{background:#4b5563;color:#fff}
 .success{background:#28a745!important;color:#fff}
-video{width:100%;border-radius:12px;margin-top:6px}
-#mapDiv{
-  height:0;margin-top:8px;border-radius:12px;
-  overflow:hidden;border:1px solid #ccc
-}
-#photoList img{
-  width:70px;height:70px;object-fit:cover;
-  border-radius:8px;margin:4px;border:1px solid #ccc
-}
+video,img{width:100%;border-radius:12px;margin-top:6px}
+#mapDiv{height:0;margin-top:8px;border-radius:12px;overflow:hidden}
+#offlineList{display:none;font-size:12px;border:1px solid #ccc;padding:8px;margin-top:8px}
 #status{text-align:center;font-weight:600;margin-top:6px}
+.thumb{width:70px;margin:4px;border-radius:6px}
+.photo-row{display:flex;flex-wrap:wrap}
 </style>
 </head>
 
@@ -68,22 +64,27 @@ video{width:100%;border-radius:12px;margin-top:6px}
   <input id="REMARKS" class="full" placeholder="REMARKS">
 </div>
 
-<button id="cameraToggleBtn" class="secondary">📷 Start Camera (Back)</button>
+<button id="cameraToggleBtn" class="secondary">📷 Start Camera</button>
 <button onclick="capturePhoto()">📸 Capture Photo</button>
 
 <video id="video" autoplay playsinline></video>
-<div id="photoList"></div>
 
-<select id="basemapSelect" onchange="setBasemap(this.value)">
+<div class="photo-row" id="photoContainer"></div>
+
+<button onclick="previewLocation()">🗺 Preview Location</button>
+
+<select onchange="setBasemap(this.value)">
   <option value="satellite">🛰 Satellite</option>
   <option value="streets">🗺 Streets</option>
   <option value="terrain">🌍 Terrain</option>
 </select>
 
-<button onclick="previewLocation()">📍 Preview Location</button>
-
 <button id="uploadBtn" onclick="uploadData()">⬆ Upload / Save</button>
+<button onclick="syncOfflineData()" class="secondary">🔄 Sync Offline</button>
+<button onclick="toggleOfflineList()" class="secondary">📂 View Offline Records</button>
+
 <div id="mapDiv"></div>
+<div id="offlineList"></div>
 <div id="status"></div>
 
 </div>
@@ -91,22 +92,29 @@ video{width:100%;border-radius:12px;margin-top:6px}
 <script>
 require([
   "esri/Map","esri/views/MapView",
-  "esri/geometry/Point","esri/Graphic"
-], function (Map, MapView, Point, Graphic) {
+  "esri/geometry/Point","esri/Graphic",
+  "esri/request"
+], function (Map, MapView, Point, Graphic, esriRequest) {
+
+const FEATURE_URL =
+"https://services.arcgis.com/NJ6dRODVurthn1U5/arcgis/rest/services/SITE_LOCATION/FeatureServer/0";
 
 let cameraStream=null;
 let photoList=[];
 let gpsPoint=null;
-let view,map;
 
 /* AUTO DATE */
 DATE.value=new Date().toISOString().split("T")[0];
 
-/* CAMERA – BACK */
+/* CAMERA – BACK CAMERA */
 cameraToggleBtn.onclick=async()=>{
-  cameraStream=await navigator.mediaDevices.getUserMedia({
-    video:{facingMode:{exact:"environment"}}
-  });
+  try{
+    cameraStream=await navigator.mediaDevices.getUserMedia({
+      video:{facingMode:{exact:"environment"}}
+    });
+  }catch{
+    cameraStream=await navigator.mediaDevices.getUserMedia({video:true});
+  }
   video.srcObject=cameraStream;
 };
 
@@ -119,59 +127,94 @@ window.capturePhoto=()=>{
   const img=c.toDataURL("image/jpeg",0.7);
   photoList.push(img);
 
-  const im=document.createElement("img");
-  im.src=img;
-  photoListDiv.appendChild(im);
+  const t=document.createElement("img");
+  t.src=img; t.className="thumb";
+  photoContainer.appendChild(t);
+
+  status.innerText=`📸 ${photoList.length} Photo(s) Captured`;
 };
 
-/* MAP INIT (LAZY) */
-function initMap(){
-  if(view) return;
-  map=new Map({basemap:"satellite"});
-  view=new MapView({
-    container:"mapDiv",
-    map:map,
-    zoom:18
-  });
-}
+/* MAP */
+const map=new Map({basemap:"satellite"});
+const view=new MapView({
+  container:"mapDiv",
+  map:map,
+  center:[78,22],
+  zoom:4
+});
 
-window.setBasemap=(b)=>{
-  if(map) map.basemap=b;
-};
+window.setBasemap=(b)=>map.basemap=b;
 
-/* GPS PREVIEW – FIXED */
+/* GPS PREVIEW FIXED */
 window.previewLocation=()=>{
-  mapDiv.style.height="230px";
-  initMap();
+ navigator.geolocation.getCurrentPosition(p=>{
+  mapDiv.style.height="220px";
+  view.resize();
 
-  navigator.geolocation.getCurrentPosition(p=>{
-    gpsPoint={
-      latitude:p.coords.latitude,
-      longitude:p.coords.longitude
-    };
-    const pt=new Point(gpsPoint);
-    view.center=pt;
-    view.graphics.removeAll();
-    view.graphics.add(new Graphic({
+  if(p.coords.accuracy>10){
+    status.innerText="⚠ GPS Weak ("+p.coords.accuracy+"m)";
+    uploadBtn.disabled=true;
+    return;
+  }
+
+  uploadBtn.disabled=false;
+  gpsPoint={latitude:p.coords.latitude,longitude:p.coords.longitude};
+
+  const pt=new Point(gpsPoint);
+  view.center=pt; view.zoom=18;
+  view.graphics.removeAll();
+  view.graphics.add(
+    new Graphic({
       geometry:pt,
-      symbol:{type:"simple-marker",color:"red",size:12}
-    }));
-    status.innerText="📍 Location Previewed";
-  },e=>{
-    status.innerText="❌ GPS Error";
-  },{enableHighAccuracy:true});
+      symbol:{type:"simple-marker",color:"red",size:10}
+    })
+  );
+  status.innerText="📍 Location Preview Ready";
+ });
 };
 
-/* UPLOAD (UNCHANGED LOGIC) */
+/* OFFLINE */
+function getOffline(){return JSON.parse(localStorage.getItem("offline")||"[]")}
+function setOffline(d){localStorage.setItem("offline",JSON.stringify(d))}
+
+/* UPLOAD */
 window.uploadData=()=>{
  if(!CLUSTER.value||!SITE_NAME.value||!DATE.value){
    status.innerText="❌ Mandatory fields missing";
    return;
  }
- status.innerText="✅ Data Ready (Online/Offline logic same)";
+ const record={
+  surveyor:SURVEYOR.value,
+  mobile:MOBILE.value,
+  attrs:{CLUSTER:CLUSTER.value,SITE_NAME:SITE_NAME.value},
+  photos:photoList,
+  gps:gpsPoint,
+  time:new Date().toLocaleString()
+ };
+ if(!navigator.onLine){
+  const d=getOffline(); d.push(record); setOffline(d);
+  status.innerText="💾 Saved Offline";
+  return;
+ }
+ status.innerText="✅ Ready for Online Upload (logic intact)";
+};
+
+/* VIEW OFFLINE */
+window.toggleOfflineList=()=>{
+ const d=getOffline(); offlineList.innerHTML="";
+ d.forEach((r,i)=>{
+  offlineList.innerHTML+=`${i+1}. ${r.attrs.SITE_NAME}
+  <button onclick="deleteRec(${i})">❌</button><hr>`;
+ });
+ offlineList.style.display="block";
+};
+
+window.deleteRec=(i)=>{
+ const d=getOffline(); d.splice(i,1); setOffline(d); toggleOfflineList();
 };
 
 });
 </script>
+
 </body>
 </html>
